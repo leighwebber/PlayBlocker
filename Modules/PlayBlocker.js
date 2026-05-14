@@ -1,813 +1,911 @@
 "use strict";
 
-import {DataStore, Speaker, speakers, Movement, createTextElement, createCircleElement, 
-  createSvgElement, createSpeakerDiv, MovementList, GetMovementListLog, GetCurrentPageNumber, 
-  TotalPageCount, GoToPage, GetClickedCharacterPosition, createRP,
-  GetPageNumberAtMovement, speakerObjFromSpeakerDiv,GetPageNumberAtCursor, getPreviousMovementMarker} from "../Modules/Backend.js";
+/**
+ * PlayBlocker.js — Front-end controller for the PlayBlocker stage-blocking tool
+ *
+ * This module owns:
+ *  - Page initialisation (DOMContentLoaded)
+ *  - Auth forms (register / login / logout)
+ *  - Script file loading and iframe management
+ *  - Speaker icon setup and drag-and-drop via Interact.js
+ *  - Movement annotation workflow (right-click → drag → drop)
+ *  - Window resize handling (repositioning icons proportionally)
+ *  - Keyboard navigation (arrows, page up/down, Escape)
+ *  - Slider-based page navigation
+ *  - Script download
+ */
 
-//#region globals
-var lastMovedSpeakerInitials = null; // Global variable to track the initials of the last moved speaker
-// var speakerAreaHeight = null;  // Global variable to store the height of the speaker area
-// var topOfColumnY = null; // Global variable to track the top Y position of the top element in the speaker area
-var speakerAreaRect = null; // Global variable to store the bounding rectangle of the speaker area
-var bottomOfColumnY = null; // Global variable to track the bottom Y position of the last element in the current column
-var imageAreaDiv = null; // Global variable to store the image area element
-var stageImageElement = null; // Global variable to store the stage image element
-var wasDroppedInImageArea = false; // Global variable to track if the speaker was dropped in the image area
-var stageImageRect = null; // Global variable to store the bounding rectangle of the stage image
-var speakerAreaElement = null;
-var pageCount = 0;
-var scriptLoaded = false;
-var divSliders = null;
-var divSlideContainer = null;
-var slider = null;
-var output = null;
-var log = "";
-var imgLeftOld = 0;
-var imgTopOld = 0;
-var imgWidthOld = 0;
-var imgHeightOld = 0;
-var imgLeftNew = 0;
-var imgTopNew = 0;
-var imgWidthNew = 0;
-var imgHeightNew = 0;
-var myIframe = null;
-var contextMenuAllowed = true;  // Default is for right-click to bring up the default context menu
-var dataStore = null;
+import {
+    DataStore, Speaker, speakers, Movement,
+    createTextElement, createCircleElement,
+    createSvgElement, createSpeakerDiv,
+    MovementList, GetMovementListLog,
+    GetCurrentPageNumber, TotalPageCount, GoToPage,
+    GetClickedCharacterPosition, createRP,
+    GetPageNumberAtMovement, speakerObjFromSpeakerDiv,
+    GetPageNumberAtCursor, getPreviousMovementMarker
+} from "../Modules/Backend.js";
 
-//#endregion
-const API_URL = "https://lwebber.ca/api"; // Replace with your actual backend URL
+// ---------------------------------------------------------------------------
+// Module-level state
+// ---------------------------------------------------------------------------
 
-//#region Register and login
-// Handle User Registration
-if(document.getElementById('registerForm')){
-document.getElementById('registerForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const formData = new FormData(e.target);
-  const data = Object.fromEntries(formData);
+/** Initials of the most recently dragged speaker — used to reset its z-index. */
+let lastMovedSpeakerInitials = null;
 
-  const response = await fetch(`${API_URL}/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  });
+/** Bounding rect of the speaker panel — cached on init and updated on resize. */
+let speakerAreaRect   = null;
 
-  if (response.ok) alert("Registration successful! You can now log in.");
-});
-}
+/** Div element that wraps the stage image (the drop zone). */
+let imageAreaDiv      = null;
 
-window.logout = async function logout(){
-  const response = await fetch(`${API_URL}/logout`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' }
-  });
-  if (response.ok) alert("Logout successful");
-}
+/** The stage image element. */
+let stageImageElement = null;
 
+/** True when the most recent drag was dropped inside the image area. */
+let wasDroppedInImageArea = false;
 
-// Handle User Login
-if(document.getElementById('loginForm')){
-document.getElementById('loginForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const formData = new FormData(e.target);
-  const data = Object.fromEntries(formData);
+/** Bounding rect of the stage image — cached and updated on resize. */
+let stageImageRect = null;
 
-  try{
-  const response = await fetch(`${API_URL}/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+/** The speaker panel container element. */
+let speakerAreaElement = null;
+
+/** Total number of pages in the loaded script. */
+let pageCount = 0;
+
+/** True once a script file has been successfully loaded into the iframe. */
+let scriptLoaded = false;
+
+/** The page-navigation slider element. */
+let slider = null;
+
+/** The element that displays the current page number alongside the slider. */
+let output = null;
+
+// Stage image dimensions — "old" = before a resize, "new" = after
+let imgLeftOld = 0, imgTopOld  = 0, imgWidthOld = 0, imgHeightOld = 0;
+let imgLeftNew = 0, imgTopNew  = 0, imgWidthNew = 0, imgHeightNew = 0;
+
+/** The script-display iframe element. */
+let myIframe = null;
+
+/**
+ * When false, right-click in the iframe shows our custom movement-start handler
+ * rather than the browser's default context menu.
+ */
+let contextMenuAllowed = true;
+
+/** Central state store for the session. */
+let dataStore = null;
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const API_URL = "https://lwebber.ca/api";
+
+// ---------------------------------------------------------------------------
+// Auth forms — Register / Login / Logout
+// ---------------------------------------------------------------------------
+
+// Only attach handlers when the relevant form elements exist on the page
+// (they live on the login page, not the main PlayBlocker page).
+
+if (document.getElementById("registerForm")) {
+    /**
+     * Submits the registration form to the API.
+     * On success, alerts the user to proceed to login.
+     */
+    document.getElementById("registerForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(e.target));
+
+        const response = await fetch(`${API_URL}/register`, {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            alert("Registration successful! You can now log in.");
+        } else {
+            alert(`Registration failed: ${response.status}`);
+        }
     });
-    const result = await response; //.json();
-    if(!response.ok){
-      alert('Bad response: ' + response.status);
-    }
-    else{
-      const data = await response.json(); 
-      console.log(data); // Access properties like data.id
-      // window.open("https://lwebber.ca/PlayBlocker.html");
-      const protectedArea = document.getElementById('protected-area');
-           protectedArea.style.display = 'block';
-    }
-  }
-  catch (error) {
-    alert("Login failed");
-  }
-});
 }
-  
-//#endregion
 
-function PlayBlockerPageSetup(){
-  document.getElementById('fileInput').addEventListener('change', function() {
-    const fileName = this.files[0] ? this.files[0].name : "No file selected";
-    document.getElementById('file-name').textContent = fileName;
-  });
-  myIframe = document.getElementById('script-iframe');
-  dataStore = new DataStore(myIframe);
-  // dataStore.CreateMovementList(10);
-  slider = document.getElementById("myRange");
-  divSlideContainer = document.getElementById('slidecontainer');
-  slider.addEventListener("change", sliderOnChange);
-  dataStore.speakerAreaHeight = document.getElementById('speaker-area').getBoundingClientRect().height;
-  window.addEventListener('resize', onResize);
-  insertSpeakers(speakerAreaElement);
-  slider.oninput = function() {
-  // console.log(`oninput this.value: ${this.value}`);
-  output.innerHTML = this.value;
-  sliderMove(this.value);
-  slider.blur();
+/**
+ * Logs the current user out by calling the API and alerts on success.
+ * Exposed on `window` so it can be called from inline HTML event attributes.
+ */
+window.logout = async function logout() {
+    const response = await fetch(`${API_URL}/logout`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" }
+    });
+    if (response.ok) alert("Logout successful");
+};
+
+if (document.getElementById("loginForm")) {
+    /**
+     * Submits the login form to the API.
+     * On success, reveals the protected content area; on failure, alerts the user.
+     */
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(e.target));
+
+        try {
+            const response = await fetch(`${API_URL}/login`, {
+                method:  "POST",
+                headers: { "Content-Type": "application/json" },
+                body:    JSON.stringify(data)
+            });
+
+            if (!response.ok) {
+                alert(`Login failed: ${response.status}`);
+                return;
+            }
+
+            const result = await response.json();
+            console.log("Login response:", result);
+            document.getElementById("protected-area").style.display = "block";
+        } catch (error) {
+            alert("Login failed — check your connection and try again.");
+        }
+    });
 }
-  output = document.getElementById("demo");
-  output.innerHTML = slider.value; // Display the default slider value
-  console.log('PlayBlocker page loaded');
-  myIframe.addEventListener('mouseleave', function() {
-    if(dataStore.newMovement){
-      document.body.style.cursor = 'not-allowed';
-    }
-    else
-      document.body.style.cursor = 'default';
-});
-  myIframe.contentWindow.addEventListener('scroll', (event) => {
-    iFrameOnScroll(event);
-  })
-  iFrameListeners();
-  contextMenuAllowed = false;
-  // This event listener manages the right-click context menu appearance
-  myIframe.contentWindow.addEventListener('contextmenu', function(event) {
-    // 1. Prevent the browser's default right-click menu
-    event.preventDefault(); 
-    if(event.target.className != 'Speech' && event.className != 'StageDirection'){
-      alert('You can only create a movement inside the text of a Speech or a StageDirection');
-      return;
-    }
-    // 2. Prevent the event from bubbling up to parent contextmenu handlers
-    event.stopPropagation(); 
-      startMovement(event);
-});
 
-  window.addEventListener('keydown', (event) => {
-    switch(event.key){
-      case 'Escape':
-        handleEscapeKey();
-        break;
-      case 'ArrowUp':
-        myIframe.contentWindow.scrollBy(0, -30); 
-        break;
-      case 'ArrowDown':
-        myIframe.contentWindow.scrollBy(0, 30); 
-        break;
-      case 'PageUp':
-        ScrollToAdjacentPage('up');
-        break;
-      case 'PageDown':
-        ScrollToAdjacentPage('down');
-        break;
-    }
-    
-    function ScrollToAdjacentPage(direction){
-      const targetElements = Array.from(iframeDoc.querySelectorAll('.PageBreak'));
-      const currentPage = GetCurrentPageNumber(myIframe);
-      var destinationPageBreak = null;
-      if(direction == 'up'){
-        destinationPageBreak = targetElements.find(e => e.innerText.includes(`-Page ${currentPage - 1}-`));
-      }
-      else {
-        destinationPageBreak = targetElements.find(e => e.innerText.includes(`-Page ${currentPage + 1}-`));
-      }
-      if(destinationPageBreak)
-        destinationPageBreak.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      // alert('Foo');
-    }
-  });
-  const getPageNumberButton = document.getElementById('get-page-number');
-  // pageCount = TotalPageCount(myIframe);
-  getPageNumberButton.addEventListener('click', function() {
-    var currentPage = GetCurrentPageNumber(myIframe);
-    var totalPages = TotalPageCount(myIframe);
-  });
-  
-  stageImageElement = document.getElementById('stage-image');
-  stageImageRect = stageImageElement.getBoundingClientRect();
-  // Record the starting dimensions of the image
-  imgLeftOld = stageImageRect.left;
-  imgTopOld = stageImageRect.top;
-  imgWidthOld = stageImageRect.width;
-  imgHeightOld = stageImageRect.height;
-  speakerAreaElement = document.getElementById('speaker-area');
-  speakerAreaRect = speakerAreaElement.getBoundingClientRect();
-  imageAreaDiv = document.getElementById('image-area');
-  // var logButton = document.getElementById('show-log');
-  // logButton.addEventListener('click', showLog);
-  stageImageElement.addEventListener('click', function(event) {
-  });
-  speakerAreaRect = document.getElementById('speaker-area').getBoundingClientRect();
-  // Store the height of the speaker area for later use
-  dataStore.speakerAreaHeight = document.getElementById('speaker-area').getBoundingClientRect().height; 
+// ---------------------------------------------------------------------------
+// PlayBlocker page initialisation
+// ---------------------------------------------------------------------------
 
-  // Listen for file selection
-  const fileInput = document.getElementById('fileInput');
-  // const fileContentDisplay = document.getElementById("file-content");
-  const messageDisplay = document.getElementById("message");
+/**
+ * Sets up all elements, event listeners, and Interact.js drop zones on the
+ * PlayBlocker page.  Called by the DOMContentLoaded handler below when the
+ * page body id is "playBlockerPage".
+ */
+function PlayBlockerPageSetup() {
+    // Show the chosen file name in the UI when a file is selected
+    document.getElementById("fileInput").addEventListener("change", function () {
+        const fileName = this.files[0] ? this.files[0].name : "No file selected";
+        document.getElementById("file-name").textContent = fileName;
+    });
 
-  fileInput.addEventListener("change", handleFileSelection);
-  const downloadButton = document.getElementById('download');
-  downloadButton.addEventListener("click", downloadTextFile);
+    // Create the central state store, referencing the script iframe
+    myIframe  = document.getElementById("script-iframe");
+    dataStore = new DataStore(myIframe);
+
+    // Speaker panel height (needed for column-wrap in createSpeakerDiv)
+    speakerAreaElement = document.getElementById("speaker-area");
+    dataStore.speakerAreaHeight = speakerAreaElement.getBoundingClientRect().height;
+    speakerAreaRect = speakerAreaElement.getBoundingClientRect();
+
+    // Stage image geometry — cached for proportional repositioning on resize
+    stageImageElement = document.getElementById("stage-image");
+    stageImageRect    = stageImageElement.getBoundingClientRect();
+    imgLeftOld   = stageImageRect.left;
+    imgTopOld    = stageImageRect.top;
+    imgWidthOld  = stageImageRect.width;
+    imgHeightOld = stageImageRect.height;
+
+    imageAreaDiv = document.getElementById("image-area");
+
+    // Page-navigation slider
+    slider = document.getElementById("myRange");
+    output = document.getElementById("demo");
+    output.innerHTML = slider.value;
+
+    slider.addEventListener("change", sliderOnChange);
+    slider.oninput = function () {
+        output.innerHTML = this.value;
+        // sliderMove() is a placeholder for future smooth-scroll behaviour
+        slider.blur();
+    };
+
+    // Download button
+    document.getElementById("download").addEventListener("click", downloadTextFile);
+
+    // File selection handler
+    document.getElementById("fileInput").addEventListener("change", handleFileSelection);
+
+    // Populate speaker icons in the speaker panel
+    insertSpeakers(speakerAreaElement);
+
+    // Keyboard navigation
+    window.addEventListener("keydown", handleKeyDown);
+
+    // Window resize — reposition icons proportionally
+    window.addEventListener("resize", onResize);
+
+    // Suppress the browser context menu inside the iframe; show ours instead
+    contextMenuAllowed = false;
+    myIframe.contentWindow.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (event.target.className !== "Speech" && event.target.className !== "StageDirection") {
+            alert("You can only create a movement inside the text of a Speech or a StageDirection");
+            return;
+        }
+        startMovement(event);
+    });
+
+    // Change cursor when the pointer leaves the iframe during a pending movement
+    myIframe.addEventListener("mouseleave", () => {
+        document.body.style.cursor = dataStore.newMovement ? "not-allowed" : "default";
+    });
+
+    // Update the page slider when the user scrolls the script
+    myIframe.contentWindow.addEventListener("scroll", iFrameOnScroll);
+
+    // Register click handler for the script iframe (used for logging click positions)
+    iFrameListeners();
+
+    // Get-page-number button (diagnostic, currently unused in production UI)
+    document.getElementById("get-page-number").addEventListener("click", () => {
+        const currentPage = GetCurrentPageNumber(myIframe);
+        const totalPages  = TotalPageCount(myIframe);
+        console.log(`Current page: ${currentPage} / ${totalPages}`);
+    });
+
+    console.log("PlayBlocker page loaded.");
 }
- 
+
+// ---------------------------------------------------------------------------
+// Speaker panel population
+// ---------------------------------------------------------------------------
+
+/**
+ * Creates Speaker objects for the current production and adds their draggable
+ * icon divs to the speaker panel.
+ *
+ * TODO: Replace the hard-coded cast list with a user-supplied input form.
+ *
+ * @param {HTMLElement} spkrContainer - The speaker panel div
+ */
+function insertSpeakers(spkrContainer) {
+    // Hard-coded cast for "And Then There Were None" — to be replaced with dynamic input
+    const cast = [
+        ["Lombard",   "LO", "green"],
+        ["Marston",   "MA", "blue"],
+        ["Claythorne","CL", "pink"],
+        ["Wargrave",  "WA", "orange"],
+        ["Blore",     "BL", "purple"],
+        ["McKenzie",  "MK", "cyan"],
+        ["Armstrong", "AR", "yellow"],
+        ["Rogers",    "RO", "brown"],
+        ["Mrs Rogers","RS", "lightgray"],
+        ["Narracot",  "NA", "black"],
+        ["Brent",     "BR", "violet"]
+    ];
+
+    cast.forEach(([name, initials, color]) => speakers.push(Speaker.create(name, initials, color)));
+
+    // Layout parameters for the main icon column
+    const divParms = { currentX: 0,  currentY: 0, yIncrement: 30, bottomOfColumnY: 0, topOfColumnY: 0 };
+    // Layout parameters for the shadow (origin-marker) column — offset 70 px to the right
+    const shadowParms = { currentX: 70, currentY: 0, yIncrement: 30, bottomOfColumnY: 0, topOfColumnY: 0 };
+
+    const speakerContainer = document.getElementById("speaker-area");
+
+    speakers.forEach((speaker) => {
+        // Create the draggable icon
+        const speakerDiv = createSpeakerDiv(dataStore, speaker, divParms, false);
+        speaker.speakerDiv = speakerDiv;
+
+        // Create the ghost/shadow icon (shown as the origin during a drag)
+        const shadowDiv = createSpeakerDiv(dataStore, speaker, shadowParms, true);
+        speaker.shadowDiv = shadowDiv;
+
+        divParms.currentY += divParms.yIncrement;
+
+        speakerContainer.appendChild(speakerDiv);
+
+        // Record the icon's starting position so it can be reset after a cancelled drag
+        speaker.originalX = speakerDiv.getAttribute("data-x");
+        speaker.originalY = speakerDiv.getAttribute("data-y");
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Log display (development helper)
+// ---------------------------------------------------------------------------
+
+/**
+ * Reveals the log panel and populates it with the current movement list log.
+ * Currently called via the "Show Log" button (if present in the HTML).
+ */
 export function showLog() {
-    const logContainer = document.getElementById('log-container');
-    const logContent = document.getElementById('log-content');
-    logContent.textContent = log;
-    logContainer.style.display = 'block';
+    const logContainer = document.getElementById("log-container");
+    const logContent   = document.getElementById("log-content");
+    logContent.textContent = GetMovementListLog("showLog", dataStore);
+    logContainer.style.display = "block";
 }
 
-function onResize(){
-    if(dataStore.speakerAreaHeight == null) return;  // Ignore the resize that occurs when the window is first opened
-    dataStore.speakerAreaHeight = document.getElementById('speaker-area').getBoundingClientRect().height;
-    stageImageElement = document.getElementById('stage-image');
-    stageImageRect = stageImageElement.getBoundingClientRect();
-    imgLeftNew = stageImageRect.left;
-    imgTopNew = stageImageRect.top;
-    imgWidthNew = stageImageRect.width;
+// ---------------------------------------------------------------------------
+// Resize handling
+// ---------------------------------------------------------------------------
+
+/**
+ * Responds to window resize events by recalculating the stage image geometry
+ * and repositioning all speaker icons proportionally.
+ */
+function onResize() {
+    // Ignore the synthetic resize that fires when the window first opens
+    if (dataStore.speakerAreaHeight == null) return;
+
+    dataStore.speakerAreaHeight = document.getElementById("speaker-area").getBoundingClientRect().height;
+
+    stageImageElement = document.getElementById("stage-image");
+    stageImageRect    = stageImageElement.getBoundingClientRect();
+    imgLeftNew   = stageImageRect.left;
+    imgTopNew    = stageImageRect.top;
+    imgWidthNew  = stageImageRect.width;
     imgHeightNew = stageImageRect.height;
-    dataStore.speakerAreaHeight = document.getElementById('speaker-area').getBoundingClientRect().height;
-    repositionSpeakers(imgLeftOld, imgLeftNew, imgTopOld, imgTopNew, imgWidthOld, imgWidthNew, imgHeightOld, imgHeightNew);
-    imgLeftOld = imgLeftNew;
-    imgTopOld = imgTopNew;
-    imgWidthOld = imgWidthNew;
+
+    repositionSpeakers(
+        imgLeftOld, imgLeftNew,
+        imgTopOld,  imgTopNew,
+        imgWidthOld, imgWidthNew,
+        imgHeightOld, imgHeightNew
+    );
+
+    // Update "old" values for the next resize
+    imgLeftOld   = imgLeftNew;
+    imgTopOld    = imgTopNew;
+    imgWidthOld  = imgWidthNew;
     imgHeightOld = imgHeightNew;
 }
 
-function handleContextMenuPreventDefault (event){
-  // A global var contextMenuAllowed determines whether the built-in context menu
-  // will appear on a right-click.
-  if (!contextMenuAllowed){
-    // standard context menu is suppressed
-    event.preventDefault();
-    window.focus()
-  }
-  else{
-    // standard context menu is allowed
-    event.currentTarget.submit();
-    window.focus()
-  }
+/**
+ * Repositions all speaker icons after a window resize so they remain at their
+ * correct proportional location on the stage image.
+ *
+ * The stage image uses CSS `object-fit: contain`, so when the window resizes both
+ * the image's size and its offset within its container can change.  We track both
+ * via the six "old" and "new" parameters.
+ *
+ * @param {number} imgLeftOld   - Image left edge before resize
+ * @param {number} imgLeftNew   - Image left edge after resize
+ * @param {number} imgTopOld    - Image top edge before resize
+ * @param {number} imgTopNew    - Image top edge after resize
+ * @param {number} imgWidthOld  - Image width before resize
+ * @param {number} imgWidthNew  - Image width after resize
+ * @param {number} imgHeightOld - Image height before resize
+ * @param {number} imgHeightNew - Image height after resize
+ */
+function repositionSpeakers(
+    imgLeftOld, imgLeftNew, imgTopOld, imgTopNew,
+    imgWidthOld, imgWidthNew, imgHeightOld, imgHeightNew
+) {
+    const speakerDivs = document.querySelectorAll(".speaker");
+    const deltaLeft   = imgLeftNew - imgLeftOld;
+    const deltaTop    = imgTopNew  - imgTopOld;
+
+    speakerDivs.forEach((speakerDiv) => {
+        const speakerObj = speakerObjFromSpeakerDiv(speakerDiv);
+
+        // Only reposition icons that have been placed on the stage image (have an RP)
+        if (!speakerObj.RP) return;
+
+        // Pixel distance from the image's top-left at the OLD size
+        const oldPixelX = speakerObj.RP.rX * imgWidthOld;
+        const oldPixelY = speakerObj.RP.rY * imgHeightOld;
+
+        // Pixel distance at the NEW size, plus any shift in the image's position
+        const newPixelX = speakerObj.RP.rX * imgWidthNew + deltaLeft;
+        const newPixelY = speakerObj.RP.rY * imgHeightNew + deltaTop;
+
+        // Apply the delta to the existing CSS transform
+        const oldFactors = parseTransform(speakerDiv.style.transform);
+        const newX = parseFloat(oldFactors.x) + (newPixelX - oldPixelX);
+        const newY = parseFloat(oldFactors.y) + (newPixelY - oldPixelY);
+
+        // Replace the translate values in the transform string
+        let newTransform = speakerDiv.style.transform
+            .replace(oldFactors.x, `${newX}px`)
+            .replace(oldFactors.y, `${newY}px`);
+        speakerDiv.style.transform = newTransform;
+
+        // Sync Interact.js's internal position tracking
+        speakerDiv.setAttribute("data-x", newX);
+        speakerDiv.setAttribute("data-y", newY);
+    });
 }
+
+// ---------------------------------------------------------------------------
+// CSS transform parser
+// ---------------------------------------------------------------------------
+
+/**
+ * Extracts the x and y values from a CSS `translate(Xpx, Ypx)` transform string.
+ * Returns { x: "0px", y: "0px" } if no translate is found.
+ *
+ * @param {string} transform - CSS transform string, e.g. "translate(100px, 200px)"
+ * @returns {{ x: string, y: string }}
+ */
+function parseTransform(transform) {
+    const match = transform.match(/translate\(\s*([^\s,]+)\s*,\s*([^\s,]+)\s*\)/);
+    if (match) return { x: match[1], y: match[2] };
+    return { x: "0px", y: "0px" };
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Extracts the speaker initials from a speaker or shadow div's id.
+ * Id format: "speaker-div-XX" or "shadow-div-XX".
+ *
+ * @param {HTMLElement} speakerDiv
+ * @returns {string}
+ */
+function speakerInitialsFromDiv(speakerDiv) {
+    return speakerDiv.id.split("-").pop();
+}
+
+/**
+ * Converts pixel coordinates (relative to the stage image's top-left corner)
+ * to proportional coordinates [0, 1].
+ *
+ * @param {{ x: number, y: number }} rawPosition - Pixel offsets from image origin
+ * @returns {{ proportionalX: number, proportionalY: number }}
+ */
+function xyToProportional(rawPosition) {
+    return {
+        proportionalX: rawPosition.x / stageImageRect.width,
+        proportionalY: rawPosition.y / stageImageRect.height
+    };
+}
+
+// ---------------------------------------------------------------------------
+// File handling
+// ---------------------------------------------------------------------------
+
+/**
+ * Handles the "file selected" event from the file input.
+ * Reads the selected HTML file and loads it into the script iframe.
+ *
+ * @param {Event} event - The change event from the file input
+ */
 function handleFileSelection(event) {
-    const file = event.target.files[0];
-    
-    // fileContentDisplay.textContent = ""; // Clear previous file content
-    // messageDisplay.textContent = ""; // Clear previous messages
+    const file            = event.target.files[0];
+    const messageDisplay  = document.getElementById("message");
 
-    // Validate file existence and type
     if (!file) {
-      showMessage("No file selected. Please choose a file.", "error");
-      return;
+        showMessage("No file selected. Please choose a file.", "error");
+        return;
     }
-
     if (!file.type.startsWith("text")) {
-      showMessage("Unsupported file type. Please select a text file.", "error");
-      return;
+        showMessage("Unsupported file type. Please select a text/HTML file.", "error");
+        return;
     }
 
-    // Read the file
     const reader = new FileReader();
+
     reader.onload = () => {
-      /* const htmlContent = reader.result;
-      const blob = new Blob([htmlContent], { type: 'text/html' });
-      const url = URL.createObjectURL(blob); */
+        // Write the file's HTML directly into the iframe body
+        myIframe.contentDocument.body.innerHTML = reader.result;
 
-     //  myIframe.src = url;
-      myIframe.contentDocument.body.innerHTML = reader.result;
-      // myIframe.srcdoc = reader.result;
-      iFrameListeners();
-      dataStore.script.fileName = file.name;
-      dataStore.script.htmlContent = myIframe.contentDocument.body.innerHTML;
-      const startingPageNum = GetCurrentPageNumber(myIframe);
-      pageCount = TotalPageCount(myIframe);
-      dataStore.movementList.pageCount = pageCount;
-      dataStore.movementList.startPage = startingPageNum;
-      slider.value = startingPageNum;
-      const pageNumDisplayElement = document.getElementById('demo');
-      pageNumDisplayElement.innerHTML = slider.value;
-      const downloadButton = document.getElementById('download');
-      var spanFileName = document.getElementById('file-name');
-      spanFileName.style.right = 150;
-      downloadButton.style.visibility = 'visible';
-      // Get the starting page number
-      scriptLoaded = true;
-      
-      divSlideContainer.style.visibility = "visible";
-/*       divSlideContainer.style.visibility = "visible";
-      divSlideContainer.style.paddingLeft = "0px"; */
+        // Re-attach click handlers (they are lost when the body is replaced)
+        iFrameListeners();
+
+        // Update state
+        dataStore.script.fileName    = file.name;
+        dataStore.script.htmlContent = myIframe.contentDocument.body.innerHTML;
+
+        const startingPage = GetCurrentPageNumber(myIframe);
+        pageCount          = TotalPageCount(myIframe);
+
+        dataStore.movementList.pageCount = pageCount;
+        dataStore.movementList.startPage = startingPage;
+
+        // Sync slider to the first visible page
+        slider.value             = startingPage;
+        output.innerHTML         = slider.value;
+
+        // Show the download button and slider now that a script is loaded
+        document.getElementById("download").style.visibility = "visible";
+        document.getElementById("slidecontainer").style.visibility = "visible";
+
+        scriptLoaded = true;
     };
+
     reader.onerror = () => {
-      showMessage("Error reading the file. Please try again.", "error");
+        showMessage("Error reading the file. Please try again.", "error");
     };
+
     reader.readAsText(file);
-  }
-
-function sliderMove(value){
-  
-  // output.innerHTML = page;
-}
-function sliderOnChange(e){
-  var fraction = e.target.value / 100;
-  var page = parseInt(pageCount * fraction);
-  console.log(`page: ${page}`);
-  GoToPage(myIframe, page);
-  dataStore.currentPage = page;
-}
-function iFrameOnScroll(event) {
-  var page = GetCurrentPageNumber(myIframe);
-  // console.log('Current page on scroll is ' + page);
-  if(page != dataStore.currentPage){
-    // console.log('Visible page is now: ' + page);
-    slider.value = 100 * page / pageCount;
-    output.innerHTML = slider.value
-  }
 }
 
-  // Displays a message to the user
-  function showMessage(message, type) {
+/**
+ * Displays a status message below the file input.
+ *
+ * @param {string} message - The message text
+ * @param {"error"|"success"} type - Determines the text colour
+ */
+function showMessage(message, type) {
+    const messageDisplay = document.getElementById("message");
     messageDisplay.textContent = message;
     messageDisplay.style.color = type === "error" ? "red" : "green";
-  }
-  /* myIframe.addEventListener('load', function() {
-    myIframe.contentDocument.body.addEventListener('contextmenu', startMovement);
-    myIframe.contentDocument.body.addEventListener('click', scriptOnClick);
-  }); */
-  // console.log(`imgLeftOld imgLeftNew  imgTopOld imgTopNew imgWidthOld imgWidthNew imgHeightOld  imgHeightNew  oldTransform  newTransform`);
-
-  
-
-function iFrameListeners(){
-  // myIframe.contentDocument.body.addEventListener('contextmenu', startMovement);
-  // 
-  myIframe.contentDocument.addEventListener('click', scriptOnClick);
-
 }
-function handleEscapeKey () {
-  console.log('ESCAPE');
-  if(dataStore.newMovement){
-    /* dataStore.newMovement.range = null;
-    dataStore.newMovement.speakerInitials = ""; */
-    const parent = dataStore.newMovement.node.parent;
-    dataStore.newMovement.node.remove();
-    
-    // dataStore.newMovement.newNode = null;
-    dataStore.newMovement = null;
-    document.body.style.cursor = "default";
-    myIframe.contentDocument.body.style.cursor = "text";
-    parent.normalize();
-  }
 
-}
-function startMovement (e) {
-  // We can only start a movement if we click in a <p> element
-  const currentElement = e.target;
-  if(e.target.className != 'Speech' && e.target.className != 'StageDirection' ){
-    alert('You can only insert a movement in a speech paragraph or a stage direction.')
-    return;
-  }
-  const offset = GetClickedCharacterPosition(myIframe);
-  const newMovement = new Movement(myIframe, imageAreaDiv, dataStore, e.target, offset)
+// ---------------------------------------------------------------------------
+// Script download
+// ---------------------------------------------------------------------------
 
-  dataStore.newMovement = newMovement;
-  window.focus();
-}
-function downloadTextFile() {    
-    const content = myIframe.contentDocument.body.innerHTML;
+/**
+ * Downloads the current state of the script (including any movement annotations)
+ * as a plain-text file.  The file name is taken from the originally loaded file.
+ */
+function downloadTextFile() {
+    const content  = myIframe.contentDocument.body.innerHTML;
     const fileName = dataStore.script.fileName;
-    // 1. Create a Blob object with the file content
-    const blob = new Blob([content], { type: 'text/plain' });
 
-    // 2. Create a temporary URL for the Blob
-    const url = URL.createObjectURL(blob);
+    const blob = new Blob([content], { type: "text/plain" });
+    const url  = URL.createObjectURL(blob);
 
-    // 3. Create a hidden anchor element
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName; // Set the default filename
-    a.style.display = 'none';
-
-    // 4. Append, click, and cleanup
+    // Use a hidden anchor to trigger the browser's save dialog
+    const a = Object.assign(document.createElement("a"), {
+        href:    url,
+        download: fileName,
+        style:   "display:none"
+    });
     document.body.appendChild(a);
     a.click();
-    
-    // Clean up memory
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
+
+// ---------------------------------------------------------------------------
+// Slider-based page navigation
+// ---------------------------------------------------------------------------
+
+/**
+ * Fires when the slider value is committed (mouseup / touch end).
+ * Navigates the iframe to the corresponding page.
+ *
+ * @param {Event} e
+ */
+function sliderOnChange(e) {
+    const page = Math.round(pageCount * (e.target.value / 100));
+    GoToPage(myIframe, page);
+    dataStore.currentPage = page;
+}
+
+/**
+ * Fires while the iframe scrolls.
+ * Keeps the slider in sync with the currently visible page.
+ */
+function iFrameOnScroll() {
+    const page = GetCurrentPageNumber(myIframe);
+    if (page !== dataStore.currentPage) {
+        slider.value    = 100 * page / pageCount;
+        output.innerHTML = slider.value;
+        dataStore.currentPage = page;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Keyboard navigation
+// ---------------------------------------------------------------------------
+
+/**
+ * Global keydown handler: arrow keys scroll the script, PageUp/PageDown jump
+ * between page breaks, and Escape cancels an in-progress movement.
+ *
+ * @param {KeyboardEvent} event
+ */
+function handleKeyDown(event) {
+    switch (event.key) {
+        case "Escape":
+            handleEscapeKey();
+            break;
+        case "ArrowUp":
+            myIframe.contentWindow.scrollBy(0, -30);
+            break;
+        case "ArrowDown":
+            myIframe.contentWindow.scrollBy(0, 30);
+            break;
+        case "PageUp":
+            scrollToAdjacentPage("up");
+            break;
+        case "PageDown":
+            scrollToAdjacentPage("down");
+            break;
+    }
+}
+
+/**
+ * Scrolls the iframe to the next or previous page break.
+ *
+ * @param {"up"|"down"} direction
+ */
+function scrollToAdjacentPage(direction) {
+    const iframeDoc   = myIframe.contentDocument || myIframe.contentWindow.document;
+    const pageBreaks  = Array.from(iframeDoc.querySelectorAll(".PageBreak"));
+    const currentPage = GetCurrentPageNumber(myIframe);
+    const targetPage  = direction === "up" ? currentPage - 1 : currentPage + 1;
+
+    const target = pageBreaks.find((el) => el.innerText.includes(`-Page ${targetPage}-`));
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// ---------------------------------------------------------------------------
+// Movement workflow
+// ---------------------------------------------------------------------------
+
+/**
+ * Cancels a pending movement (one that has been started with a right-click but
+ * not yet completed with a drop).
+ * Removes the placeholder span from the script and resets cursor/state.
+ */
+function handleEscapeKey() {
+    if (!dataStore.newMovement) return;
+
+    const span   = dataStore.newMovement.node;
+    const parent = span?.parentNode;
+    span?.remove();
+    parent?.normalize(); // Merge split text nodes back together
+
+    dataStore.newMovement = null;
+    document.body.style.cursor = "default";
+    myIframe.contentDocument.body.style.cursor = "text";
+}
+
+/**
+ * Begins a new movement annotation at the position the user right-clicked.
+ * Only valid inside Speech or StageDirection paragraphs.
+ *
+ * @param {MouseEvent} e - The contextmenu event from inside the iframe
+ */
+function startMovement(e) {
+    if (e.target.className !== "Speech" && e.target.className !== "StageDirection") {
+        alert("You can only insert a movement in a speech paragraph or a stage direction.");
+        return;
+    }
+
+    const offset     = GetClickedCharacterPosition(myIframe);
+    const newMovement = new Movement(myIframe, imageAreaDiv, dataStore, e.target, offset);
+    dataStore.newMovement = newMovement;
+    window.focus();
+}
+
+// ---------------------------------------------------------------------------
+// iframe click listener
+// ---------------------------------------------------------------------------
+
+/**
+ * Re-attaches the click listener to the iframe body.
+ * Must be called after the iframe body is replaced (e.g. on file load).
+ */
+function iFrameListeners() {
+    myIframe.contentDocument.addEventListener("click", scriptOnClick);
+}
+
+/**
+ * Logs the clicked character position — used during development to verify
+ * that the offset calculation is correct.
+ *
+ * @param {MouseEvent} e
+ */
+function scriptOnClick(e) {
+    const x = GetClickedCharacterPosition(myIframe);
+    console.log("Clicked at character offset:", x);
+}
+
+// ---------------------------------------------------------------------------
+// Iframe selection wrapper (utility — currently not wired to UI)
+// ---------------------------------------------------------------------------
+
+/**
+ * Wraps the current text selection inside the iframe with a new element.
+ * Useful for future annotation features.
+ *
+ * @param {string} iframeId  - The iframe element id
+ * @param {string} tagName   - The tag to wrap with, e.g. "span"
+ * @param {string} [className] - Optional CSS class for the wrapper
+ */
 function wrapIframeSelection(iframeId, tagName, className) {
-    const iframe = document.getElementById(iframeId);
+    const iframe    = document.getElementById(iframeId);
     const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
     const selection = iframe.contentWindow.getSelection();
 
     if (selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        
-        // Create the wrapper element
+        const range   = selection.getRangeAt(0);
         const wrapper = iframeDoc.createElement(tagName);
-        wrapper.id = 'foo';
         if (className) wrapper.className = className;
-        
+
         try {
-            // Surrounds the selected range with the new element
             range.surroundContents(wrapper);
         } catch (e) {
-            // surroundContents fails if selection crosses block boundaries
-            console.error("Selection crosses multiple nodes; cannot wrap directly.", e);
+            // surroundContents throws if the selection spans block boundaries
+            console.error("wrapIframeSelection: selection crosses multiple nodes.", e);
         }
     }
 }
-function scriptOnClick(e) {
-  var x = GetClickedCharacterPosition(myIframe);
-  console.log('Clicked at ' + x);
-}
 
-document.addEventListener('DOMContentLoaded', function() {
-  log = "Initials\tspkrDivDataX\tspkrDivDataY\tspeakerAreaRectTop\tspeakerAreaRectLeft\tPageX\tPageY\tClientX\tClientY\tOffsetX\tOffsetY\n"; // Initialize log with headers
-  switch (document.body.id) {
-    case 'playBlockerPage':
-      PlayBlockerPageSetup();
-      break;
-    case 'indexPage':
-      console.log('Index page loaded');
-      break;
-    default:
-      console.log('Unknown page loaded');
-  }
+// ---------------------------------------------------------------------------
+// DOMContentLoaded — entry point
+// ---------------------------------------------------------------------------
+
+document.addEventListener("DOMContentLoaded", () => {
+    // Route to the correct page initialiser based on the body id
+    switch (document.body.id) {
+        case "playBlockerPage":
+            PlayBlockerPageSetup();
+            break;
+        case "indexPage":
+            console.log("Index page loaded.");
+            break;
+        default:
+            console.log("Unknown page id:", document.body.id);
+    }
 });
 
-function parseTransform(transform){
-  const regex = /translate\(\s*([^\s,]+)\s*,\s*([^\s,]+)\s*\)/;
-  const match = transform.match(regex);
-  var transformFactors = {
-    x: 0,
-    y: 0
-  }
-  if (match) {
-    transformFactors.x = match[1]; // "100px"
-    transformFactors.y = match[2]; // "200px"
-  }
-  return transformFactors;
-}
-//#region Interact
-interact('.draggable').draggable({
-  styleCursor: true, 
-   cursorChecker: (action, interactable, element, interacting) => {
-    // 'interacting' is true while the user is actively dragging
-    if (interacting) {
-      return 'grabbing'; // Cursor while dragging
+// ---------------------------------------------------------------------------
+// Interact.js — drag-and-drop configuration
+// ---------------------------------------------------------------------------
+
+/**
+ * Draggable configuration for all `.draggable` elements (speaker icons).
+ *
+ * Movement is restricted to the `#image-area` div.  Position is tracked via
+ * CSS transform and mirrored in `data-x` / `data-y` attributes so Interact.js
+ * can accumulate deltas across multiple drags.
+ */
+interact(".draggable").draggable({
+    styleCursor: true,
+
+    // Show a "grab" cursor on hover and "grabbing" while dragging
+    cursorChecker: (action, interactable, element, interacting) =>
+        interacting ? "grabbing" : "grab",
+
+    modifiers: [
+        interact.modifiers.restrictRect({
+            restriction: "#image-area",
+            endOnly:     false
+        })
+    ],
+
+    listeners: {
+
+        /**
+         * Drag-start: if a pending movement exists, link this speaker to it and
+         * set up the shadow icon at the drag origin.
+         */
+        start(event) {
+            // Store the pre-drag transform so we can restore it if the drop is invalid
+            event.target.originalTransform = event.target.style.transform;
+
+            if (dataStore.newMovement) {
+                // The user right-clicked first (creating a pending movement), then
+                // started dragging a speaker icon.  We now know which speaker is moving.
+                const initials = event.target.id.split("-").pop();
+                const speaker  = speakers.find((s) => s.speakerInitials === initials);
+
+                // Linking the speaker updates the placeholder span in the script text
+                dataStore.newMovement.speaker = speaker;
+
+                // Promote newMovement → incompleteMovement (has a speaker, needs a drop)
+                dataStore.incompleteMovement = dataStore.newMovement;
+                dataStore.incompleteMovement.speakerDiv = event.target;
+                dataStore.newMovement = null; // Prevents new movements while dragging
+
+                // Place the shadow icon at the drag-start position
+                const shadowDiv = speaker.shadowDiv;
+                shadowDiv.style.transform = event.target.style.transform;
+                shadowDiv.setAttribute("data-x", event.target.getAttribute("data-x"));
+                shadowDiv.setAttribute("data-y", event.target.getAttribute("data-y"));
+                shadowDiv.style.zIndex = 100;
+                speakerAreaElement.appendChild(shadowDiv);
+
+                dataStore.incompleteMovement.shadowDiv = shadowDiv;
+            }
+        },
+
+        /**
+         * Drag-move: update the icon's position and redraw the connector line.
+         */
+        move(event) {
+            const target   = event.target;
+            const x = (parseFloat(target.getAttribute("data-x")) || 0) + event.dx;
+            const y = (parseFloat(target.getAttribute("data-y")) || 0) + event.dy;
+
+            target.style.transform = `translate(${x}px, ${y}px)`;
+            target.setAttribute("data-x", x);
+            target.setAttribute("data-y", y);
+            target.style.zIndex = 1000; // Appear on top during drag
+
+            // Redraw the connector line while dragging
+            if (dataStore.incompleteMovement) {
+                dataStore.incompleteMovement.drawLines();
+            }
+
+            // Reset the previous speaker's z-index so it doesn't stay on top
+            if (lastMovedSpeakerInitials && lastMovedSpeakerInitials !== speakerInitialsFromDiv(target)) {
+                const prev = document.getElementById(`speaker-div-${lastMovedSpeakerInitials}`);
+                if (prev) prev.style.zIndex = 100;
+            }
+            lastMovedSpeakerInitials = speakerInitialsFromDiv(target);
+            wasDroppedInImageArea = false;
+        },
+
+        /**
+         * Drag-end: if the icon was not dropped in the image area, restore it to
+         * its pre-drag position.
+         */
+        end(event) {
+            if (event.target.onImage) {
+                // Dropped successfully on stage — leave it where it landed
+                return;
+            }
+            if (!wasDroppedInImageArea) {
+                // Restore transform and Interact.js tracking attributes
+                event.target.style.transform = event.target.originalTransform;
+                const factors = parseTransform(event.target.originalTransform);
+                event.target.setAttribute("data-x", parseFloat(factors.x));
+                event.target.setAttribute("data-y", parseFloat(factors.y));
+                event.target.originalTransform = null;
+            }
+        }
     }
-    return 'grab'; // Cursor on hover
-  },
-  modifiers: [
-    interact.modifiers.restrictRect({
-      restriction: '#image-area', // Restricts to this element
-      endOnly: false            // Always active during the drag
-    })
-  ],
-  listeners: {
-    start (event) {
-      event.target.originalTransform = event.target.style.transform;
-      if(dataStore.newMovement){   // The user has clicked on a speaker icon after inserting a new movement
-        // When the user started this movement, they right-clicked in the script.
-        // The system created a newMovement object and inserted a span
-        // whose text was [?]. At that instant, we didn't know which speakers was
-        // going to be moving. When the user then starts to drag a speaker icon (the only
-        // allowed thing to drag), this method fires. Now we know which speaker
-        // is moving, and we need to tell the newMovement object.
-
-        // Get the speaker the user clicked on
-        var speakerInitials = event.target.id.split('-').pop();
-        const speaker = speakers.find(s => s.speakerInitials === speakerInitials);
-        // Now tell the newMovement object who the speaker is. The newMovement object
-        // is going to update the <span ...>[?]</span> to insert the speaker's
-        // initials. It will then create a shadow icon and connecting lines to show
-        // where the user is dragging the icon. See the Movement set speaker(value) method
-        // for details.
-        dataStore.newMovement.speaker = speaker;
-        
-        // We now have an incomplete movement underway. It will be
-        // completed when the user drops the speaker icon on the image
-        dataStore.incompleteMovement = dataStore.newMovement;
-        dataStore.incompleteMovement.speakerDiv = event.target;
-        // Now that the movement has been initiated, we set newMovement to null. 
-        // This signals that we are in the middle of a movement, 
-        // and any subsequent right-clicks in the script should not 
-        // start new movements.
-        dataStore.newMovement = null;
-        const shadowDiv = speaker.shadowDiv;
-        shadowDiv.style.transform = "translate(0px, 0px)"
-        shadowDiv.setAttribute('data-x', 0);
-        shadowDiv.setAttribute('data-y', 0);
-        shadowDiv.node = speakerAreaElement.appendChild(shadowDiv);
-        shadowDiv.setAttribute('data-x', event.target.getAttribute('data-x'));
-        shadowDiv.setAttribute('data-y', event.target.getAttribute('data-y'));
-        shadowDiv.style.zIndex = 100;
-        shadowDiv.style.transform = event.target.style.transform;
-        dataStore.incompleteMovement.shadowDiv = shadowDiv;
-      }
-      /* if(dataStore.newMovement){
-        // The user has started to define a character movement. When they
-        // begin a drag, we need to create a new CharacterMovement object
-      } */
-    },
-    move (event) {
-      const target = event.target;
-      var speakerInitials = target.id.split('-').pop();
-      const speaker = speakers.find(s => s.speakerInitials === speakerInitials);
-      event.target.onImage = false; // Reset the flag at the start of each move
-      // Interact stores the drag target's current translate parms in data-x and y
-      // Here, we increment the translate parms by the movement deltas. THe Interact
-      // system automatically tracks changes in position in the event.dx,y properties.
-      const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
-      const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
-      // The next line actually moves the target
-      target.style.transform = `translate(${x}px, ${y}px)`;
-      // If we are in a move, the shadow div must be visible, and we need to 
-      // redraw the connecting lines as the speaker icon moves
-      if(dataStore.incompleteMovement){
-        dataStore.incompleteMovement.drawLines();
-      }
-      // If the user later tries to drop the target outside the permitted area,
-      // we need to put the target back where it was at the start of the drag
-      if(!target.originalTransform) {
-        target.originalTransform = target.style.transform; // Store the original transform for this element
-      }
-      // Update the target's data-x,y attributes
-      target.setAttribute('data-x', x);
-      target.setAttribute('data-y', y);
-      // We want the dragged target to appear on top of anything else
-      target.style.zIndex = 1000;
-      // If 
-
-
-      // reset the last moved speaker z-index to 100 (not zero, or it will disappear behind the image!)
-      if (lastMovedSpeakerInitials && lastMovedSpeakerInitials !== target.id.split('-').pop()) {
-        const lastMovedSpeaker = document.getElementById(`speaker-div-${lastMovedSpeakerInitials}`);
-        lastMovedSpeaker.style.zIndex = 100;
-      }
-      lastMovedSpeakerInitials = target.id.split('-').pop();
-      wasDroppedInImageArea = false; // Reset the flag at the start of each move
-    },
-    end (event) {
-       // Reset the transform to the original position
-       if(event.target.onImage) { // If the speaker was dropped in the image area, keep it there
-        return;
-        // event.target.onImage = false; // Reset the flag for future drags
-       }
-      if (!wasDroppedInImageArea) {
-       // onsole.log(`end: style.transform before reset: ${event.target.style.transform}, changing to originalTransform: ${event.target.originalTransform}`);
-       event.target.style.transform = event.target.originalTransform; // Reset to the original transform
-       var transformFactors = parseTransform(event.target.style.transform);
-       /* const regex = /translate\(\s*([^\s,]+)\s*,\s*([^\s,]+)\s*\)/;
-       const match = event.target.style.transform.match(regex);
-       var x, y;
-       if (match) {
-          x = match[1]; // "100px"
-          y = match[2]; // "200px"
-        } */
-       event.target.setAttribute('data-x', parseFloat(transformFactors.x));
-       event.target.setAttribute('data-y', parseFloat(transformFactors.y));
-       //Reset originalTransform to null -- it will be set on the next drag start  
-       event.target.originalTransform = null; 
-      }
-    }
-
-  }
 });
 
-interact('.stage-image')
-  .dropzone({
-    accept: '.speaker',
-    overlap: 'center',
-    ondragenter: function (event) {
-    // Change cursor when entering this zone
-      event.relatedTarget.style.cursor = 'grabbing';
+/**
+ * Drop zone configuration for the stage image.
+ *
+ * When a speaker icon is dropped here:
+ *   - The drop position is converted to a proportional RP value and stored on the speaker
+ *   - The incompleteMovement is cleared (movement is now complete)
+ */
+interact(".stage-image").dropzone({
+    accept:  ".speaker",
+    overlap: "center",
+
+    ondragenter(event) {
+        event.relatedTarget.style.cursor = "grabbing";
     },
-    ondragleave: function (event) {
-      // Reset cursor when leaving
-      event.relatedTarget.style.cursor = 'not-allowed';
+
+    ondragleave(event) {
+        event.relatedTarget.style.cursor = "not-allowed";
     },
-    ondrop: function (event) {
-      // If a drop occurs outside the permitted area, ondrop never fires.
-      wasDroppedInImageArea = true;
-      event.relatedTarget.onImage = true;
-      // The rawPosition is the pixel distance from the left and top of the drop zone.
-      // To calculate it, we take the clientX value (which is relative to the Div that contains
-      // both the speaker icons and the div that holds the image) and subtract stageImageRect.left.
-      var rawPosition = { x: event.dragEvent.clientX - stageImageRect.left, y: event.dragEvent.clientY - stageImageRect.top };
-      var rP = createRP(event.dragEvent.clientX, event.dragEvent.clientY, stageImageElement, imageAreaDiv)
-      // We need to calculate the proportional position of the drag element in relation to the 
-      // dropzone. E.g. if a drag element is dropped one-quarter of the way across the target and
-      // halfway down, the proportional position would be 0.25, 0.5. This is needed
-      // in case the user resizes the window, whcih will resize the image (drop zone).
-      // The drag-drop mechanism tracks positions by the transform.transpose css style.
-      // the x,y values in the css style are displacements from the object's original
-      // position. The interact system doesn't know or care if the window gets resized.
-      // But we do.
-      
-      
-      var proportionalPosition = xyToProportional(rawPosition);
-      var speakerDiv = event.relatedTarget;
-      // We store the proportional position inside the speaker object, not the Div,
-      // because when we generate movement path markers (which will be separate 
-      // divs), we need to know the
-      // proportional positions
-      // var speakerInitials = speakerDiv.id.split('-').pop();
-      // var speakerObj = speakers.find(s => s.speakerInitials === speakerInitials);
-      var speakerObj = speakerObjFromSpeakerDiv(speakerDiv);
-      speakerObj.RP = rP;
-      // speakerObj.proportionalPosition = proportionalPosition;
-      // Set all speakers to z-index 100 so that the one we are dropping will appear on top
-      const speakerDivs = document.querySelectorAll('.speaker');
-      document.body.style.cursor = "default";
-      myIframe.contentDocument.body.style.cursor = "text";
-      if(dataStore.newMovement){
-        dataStore.newMovement = null;
-        console.log(GetMovementListLog('564', dataStore));
-      }
+
+    ondrop(event) {
+        wasDroppedInImageArea  = true;
+        event.relatedTarget.onImage = true;
+
+        // Compute proportional position on the stage image
+        const rP = createRP(
+            event.dragEvent.clientX,
+            event.dragEvent.clientY,
+            stageImageElement,
+            imageAreaDiv
+        );
+
+        const speakerDiv = event.relatedTarget;
+        const speakerObj = speakerObjFromSpeakerDiv(speakerDiv);
+        speakerObj.RP    = rP;
+
+        document.body.style.cursor            = "default";
+        myIframe.contentDocument.body.style.cursor = "text";
+
+        // The movement is complete
+        if (dataStore.incompleteMovement) {
+            dataStore.incompleteMovement = null;
+        }
+        if (dataStore.newMovement) {
+            dataStore.newMovement = null;
+            console.log(GetMovementListLog("ondrop", dataStore));
+        }
     }
-  })
-  .on('dropactivate', function (event) {
-    event.target.classList.add('drop-activated')
-  })
-  interact('.dropzone').dropzone({
-  accept: '.draggable',
+
+}).on("dropactivate", (event) => {
+    event.target.classList.add("drop-activated");
 });
-//#endregion
 
-
-function xyToProportional(rawPosition) {
-  // 
-  const proportionalX = rawPosition.x / stageImageRect.width;
-  const proportionalY = rawPosition.y / stageImageRect.height;
-  return { proportionalX, proportionalY };
-}
-/* function proportionalToXY(speakerDiv) {
-  var speakerInitials = speakerDiv.id.split('-').pop();
-  const speakerObj = speakers.find(s => s.speakerInitials === speakerInitials);
-  const speakerDivRect = speakerDiv.getBoundingClientRect();
-  const proportionalPosition = speakerObj.proportionalPosition;
-  const stageImageLeft = stageImageRect.left;
-  const stageImageTop = stageImageRect.top;
-  const speakerAreaLeft = speakerAreaRect.left;
-  const speakerAreaTop = speakerAreaRect.top;
-  const data_x = speakerDiv.getAttribute('data-x');
-  const data_y = speakerDiv.getAttribute('data-y');
-  const x = proportionalPosition.proportionalX * stageImageRect.width + stageImageRect.left - (speakerDivRect.left - data_x);
-  const y = proportionalPosition.proportionalY * stageImageRect.height + stageImageRect.top - (speakerDivRect.top - data_y);
-  console.log(`**** propToXY data-x,y: (${data_x}, ${data_y}) stageImageLeft: ${stageImageLeft} Top: ${stageImageTop} speakerAreaLeft: ${speakerAreaLeft} Top: ${speakerAreaTop} Result: ${x}, ${y}`);
-  return { x, y };
-} */
-
-function repositionSpeakers(imgLeftOld, imgLeftNew, imgTopOld, imgTopNew, imgWidthOld, imgWidthNew, imgHeightOld, imgHeightNew) {
-  // This function is called when the window is resized. Every icon that is on the image must
-  // be repositioned to its correct location accounting for the change in the image size and 
-  // position.
-  const speakerDivs = document.querySelectorAll('.speaker');
-  // The pixelDistance objects hold the pizel distance of the icon from the left and top
-  // of the image. E.g. if the image is 600 px wide and 400 px tall and the icon proportional position is
-  // 0.5, 0.25, then the pixelDistance.x is 300 and .y is 100. The pixelDistance0 holds the values
-  // before the resize began, and the pixleDistance1 holds values now that the window has been resized.
-  var pixelDistance0 = {
-    x: 0,
-    y:0
-  }, pixelDistance1 = {
-    x: 0,
-    y: 0
-  }, deltaLeft, deltaTop;
-  // deltaLeft and Top hold the horizontal and vertical movement of the image on the page
-  speakerDivs.forEach(function(speakerDiv) {
-    var speakerInitials = speakerInitialsFromDiv(speakerDiv);
-    const speakerObj = speakerObjFromSpeakerDiv(speakerDiv);
-    // If the speaker object has a proportionalPosition value, we must adjust its
-    // position. Otherwise we leave it alone (it will stay where it was originally placed
-    // by the startup code).
-    if(speakerObj.RP){
-      deltaLeft = imgLeftNew - imgLeftOld;
-      deltaTop = imgTopNew - imgTopOld;
-      // First, we calculate the old pixel distances (proportion * width/top)
-      pixelDistance0.x = speakerObj.RP.rX * imgWidthOld;
-      pixelDistance0.y = speakerObj.RP.rY * imgHeightOld;
-      // The new pixel distances are based on the new image size -- PLUS the horizontal
-      // and vertical position changes of the image itself.
-      pixelDistance1.x = speakerObj.RP.rX * imgWidthNew + deltaLeft;
-      pixelDistance1.y = speakerObj.RP.rY * imgHeightNew + deltaTop;
-      // Compute the deltas
-      var deltaX = pixelDistance1.x - pixelDistance0.x;
-      var deltaY = pixelDistance1.y - pixelDistance0.y;
-      var oldTransform = speakerDiv.style.transform;
-      // Pull out the transform factors from the old transform
-      var oldFactors = parseTransform(oldTransform);
-      var oldX = parseFloat(oldFactors.x);
-      var oldY = parseFloat(oldFactors.y);
-      // Compute the new transform factors
-      var newX = oldX + deltaX;
-      var newY = oldY + deltaY;
-      // Replace the old factors with the new ones.
-      var newTransform = oldTransform.replace(oldFactors.x, `${newX}px`);
-      newTransform = newTransform.replace(oldFactors.y, `${newY}px`);
-      // Move the speakerDiv
-      speakerDiv.style.transform = newTransform;
-      // ... and tell the Interact system that we have moved the icon
-      speakerDiv.setAttribute('data-x', newX);
-      speakerDiv.setAttribute('data-y', newY);
-    }
-  });
-}
-
-function speakerInitialsFromDiv(speakerDiv){
-  return speakerDiv.id.split('-').pop();
-}
-
-// During development, we create a bunch of speakers via code.
-// In the production version, we will prompt the user to 
-// supply this info.
-function insertSpeakers(spkrContainer){
-  speakers.push(Speaker.create("Lombard", "LO", "green"));
-  speakers.push(Speaker.create("Marston", "MA", "blue"));
-  speakers.push(Speaker.create("Claythorne", "CL", "pink"));
-  speakers.push(Speaker.create("Wargrave", "WA", "orange"));
-  speakers.push(Speaker.create("Blore", "BL", "purple"));
-  speakers.push(Speaker.create("McKenzie", "MK", "cyan"));
-  speakers.push(Speaker.create("Armstrong", "AR", "yellow"));
-  speakers.push(Speaker.create("Rogers", "RO", "brown"));
-  speakers.push(Speaker.create("Mrs Rogers", "RS", "lightgray"));
-  speakers.push(Speaker.create("Narracot", "NA", "black"));
-  speakers.push(Speaker.create("Brent", "BR", "violet"));
-  // speakers.push();
-  /* var currentY = 0;
-  var currentX = 0;
-  var yIncrement = 30;
-  var bottomOfColumnY = 0;
-  var topOfColumnY = 0; */
-  const divParms = {
-    currentY: 0,
-    currentX: 0,
-    yIncrement: 30,
-    bottomOfColumnY: 0,
-    topOfColumnY: 0
-  }
-  const shadowParms = {
-    currentY: 0,
-    currentX: 70,
-    yIncrement: 30,
-    bottomOfColumnY: 0,
-    topOfColumnY: 0
-  }
-  speakers.forEach(speaker => {
-    // Get the Div that contains the speaker divs
-    const speakerContainer = document.getElementById('speaker-area');
-    // Create a speaker div for this speaker
-    var isShadow = false;  // a Shadow div is used to show the starting point of a movement
-    const speakerDiv = createSpeakerDiv(dataStore, speaker, divParms, isShadow);
-    speaker.speakerDiv = speakerDiv;
-    isShadow = true;
-    // divParms.currentX = 100;;
-    const shadowDiv = createSpeakerDiv(dataStore, speaker, shadowParms, isShadow);
-    speaker.shadowDiv = shadowDiv;
-    divParms.currentY += divParms.yIncrement;
-    // Insert it into the container div
-    speakerContainer.appendChild(speakerDiv);
-    speaker.originalX = speakerDiv.getAttribute('data-x');
-    speaker.originalY = speakerDiv.getAttribute('data-y');
-    // speakerContainer.appendChild(shadowDiv);
-
-  });
-}
-
-
-
-var slider = null;
-
-  function scrollOneScreen () {
-    if (myIframe && myIframe.contentWindow) {
-      const screenHeight = myIframe.contentWindow.innerHeight;
-      myIframe.contentWindow.scrollBy({
-          top: screenHeight,
-          left: 0,
-          behavior: 'smooth' // Optional: adds smooth scrolling animation
-      });
-    }
-  }
-  var snapTargets = [{x: 100, y: 300}];
-
-  function ZmakeSnapTargets() {
-    // Get width of sliders div
-    const divSliders = document.getElementById('div-sliders');
-    const divSlidersRect = divSliders.getBoundingClientRect();
-    const divWidth = divSlidersRect.width;
-    const myIframe = document.getElementById('script-iframe');
-    const pageCount = TotalPageCount(myIframe);
-    // We want one target for each page.
-    var targets = [];
-    if(pageCount == 0) return [{x: 100, y: 300}];
-    for(var i = 1; i <= pageCount; i++){
-      targets.push({x: i * divWidth / 100, y: 300});
-    }
-    snapTargets = targets;
-  }
+// Ensure the dropzone also accepts .draggable elements (belt-and-suspenders)
+interact(".dropzone").dropzone({ accept: ".draggable" });
