@@ -1,0 +1,25 @@
+{
+  "name": "playblockerinteract",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "colors-named-hex": "^1.0.4",
+    "interactjs": "^1.10.27"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leighwebber/PlayBlockerInteract.git"
+  },
+  "keywords": [],
+  "author": "Leigh Webber",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/leighwebber/PlayBlockerInteract/issues"
+  },
+  "homepage": "https://github.com/leighwebber/PlayBlockerInteract#readme",
+  "description": ""
+}

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script>
+        (async function validateSession() {
+            const VALIDATE_URL = "https://lwebber.ca/api/validate";
+
+            // Pages that should never trigger a redirect (e.g. the login page itself)
+            const PUBLIC_PATHS = ["/login", "/login.html"];
+
+            const isPublicPage = PUBLIC_PATHS.some(p =>
+                window.location.pathname === p || window.location.pathname.startsWith(p)
+            );
+
+            try {
+                const response = await fetch(VALIDATE_URL, {
+                    method: "GET",
+                    credentials: "include",   // sends the httpOnly cookie automatically
+                    headers: {
+                    "Accept": "application/json"
+                    }
+                });
+
+                if (response.ok) {
+                    // Token is valid — optionally expose the payload to the page
+                    const data = await response.json().catch(() => null);
+                    if (data) {
+                    // Store non-sensitive info for the rest of the page to use
+                    window.__session = data;
+                    }
+                } else {
+                    // 401 / 403 → token missing, expired, or invalid
+                    if (!isPublicPage) {
+                    window.location.href = "/login.html?reason=session_expired";
+                    }
+                }
+            } catch (err) {
+                // Network error or server unreachable
+                console.warn("[auth] Validation request failed:", err);
+                if (!isPublicPage) {
+                    window.location.href = "/login?reason=network_error";
+                }
+            }
+        })();
+    </script>
+
+
+
+
+    <meta charset="utf-8">
+    <title>Dramatic Productions</title>
+    <script type="module" src="../node_modules/interactjs/dist/interact.min.js"></script>
+    <link rel="stylesheet" href="../css/PlayBlocker.css">
+</head>
+<body id="productionsPage">
+    <h1>Dramatic Productions</h1>
+    <p>Manage dramatic productions for <span id="username">user</span></p>
+ 
+</body>
+</html>
+

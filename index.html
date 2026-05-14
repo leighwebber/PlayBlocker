@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Hello World</title>
+    <script type="module" src="../node_modules/interactjs/dist/interact.min.js"></script>
+    <script type="module" src="../Modules/PlayBlocker.js"></script>
+    <script type="module" src="../index.js"></script>
+    <link rel="stylesheet" href="../css/PlayBlocker.css">
+</head>
+<body id="homePage">
+    <h1>PlayBlocker</h1>
+    <p>An app for designing blocking for a play.</p>
+    <div id="auth-forms">
+        <h2>Register</h2>
+        <form id="registerForm">
+            <input type="username" name="username" placeholder="User name" required>
+            <input type="email" name="email" placeholder="Email" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit">Register</button>
+        </form>
+
+        <h2>Login</h2>
+        <form id="loginForm">
+            <input type="email" name="email" placeholder="Email" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+        <h2>Logout</h2>
+        <button id="logout_button" onclick="logout()">Log out</button>
+    </div>
+
+<div id="protected-area" style="display:none;">
+  <h2>Welcome!</h2>
+  <a href="./Pages/Productions.html">Productions</a>
+  <a href="./Pages/PlayBlocker.html">PlayBlocker</a>
+</div>
+
+
+
+
+
+    
+    
+</body>
+</html>
+

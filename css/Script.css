@@ -1,0 +1,47 @@
+body    {
+    font-family: 'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;
+    font-size: 10pt;
+}
+.Act    {
+    font-weight: bold;
+    color: red;
+}
+.Scene  {
+    font-weight: bold;
+    color: red;
+}
+.StageDirection {
+    font-style: italic;
+    color: green;
+}
+.PageBreak  {
+    font-size: 10pt;
+    color: red;
+    text-align: center;
+    font-weight: bold;
+}
+.Speaker    {
+    font-weight: bold;
+    color: blue;
+}
+.Speech {
+    padding-left: 20px;
+    margin-bottom: 10px;
+}
+.movement-placeholder {
+  color: red;
+  font-weight: bold;
+}
+.m-new {
+    color: red;
+    font-weight: bold;
+}
+.m-normal {
+    color: green;
+    font-weight: bold;
+}
+span {
+    padding: 0;
+    margin: 0;
+    display: inline;
+}
