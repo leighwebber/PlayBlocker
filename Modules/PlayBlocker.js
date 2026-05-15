@@ -26,6 +26,9 @@ import {
     GetPageNumberAtCursor, getPreviousMovementMarker
 } from "../Modules/Backend.js";
 
+import {
+    saveScript
+} from  "../Modules/Database.js";
 // ---------------------------------------------------------------------------
 // Module-level state
 // ---------------------------------------------------------------------------
@@ -508,7 +511,7 @@ function handleFileSelection(event) {
         output.innerHTML         = slider.value;
 
         // Show the download button and slider now that a script is loaded
-        document.getElementById("download").style.visibility = "visible";
+        document.getElementById("saveScript").style.visibility = "visible";
         document.getElementById("slidecontainer").style.visibility = "visible";
 
         scriptLoaded = true;
@@ -533,31 +536,6 @@ function showMessage(message, type) {
     messageDisplay.style.color = type === "error" ? "red" : "green";
 }
 
-// ---------------------------------------------------------------------------
-// Script saveScript
-// ---------------------------------------------------------------------------
-
-/**
- * Saves the current script (including any movement annotations)
- * to the database
- */
-async function saveScript() {
-  const content = myIframe.contentDocument.body.innerHTML;
-  debugger;
-  const response = await fetch(`${API_URL}/saveScript`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ content }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to save script: ${response.statusText}`);
-  }
-
-  return await response.json();
-}
 
 // ---------------------------------------------------------------------------
 // Script download
