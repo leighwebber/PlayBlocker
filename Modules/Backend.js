@@ -894,6 +894,26 @@ export class Movement {
     }
 
     /**
+     * Erases and redraws every segment in the full connector chain.
+     *
+     * Called after a window resize, when speaker/shadow positions may have changed.
+     * Unlike drawLines(), this redraws ALL segments — not just the trailing one —
+     * because every waypoint's position is final for completed movements.
+     *
+     * Chain: shadowDiv → marker[0] → … → marker[n] → speakerDiv
+     */
+    redrawAllLines() {
+        if (!this.speakerDiv || !this.shadowDiv) return;
+
+        const chain = [this.shadowDiv, ...this.movementMarkers, this.speakerDiv];
+
+        for (let i = 0; i < chain.length - 1; i++) {
+            eraseLine(chain[i]);
+            drawLine(chain[i], chain[i + 1]);
+        }
+    }
+
+    /**
      * Called when the user presses spacebar during a drag.
      * Freezes the current speakerDiv position as a new movement marker, draws the
      * permanent segment from the previous waypoint to the new marker, and hands the
