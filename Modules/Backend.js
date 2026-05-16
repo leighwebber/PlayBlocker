@@ -767,7 +767,7 @@ export class Movement {
      * live trailing line off to the new marker.
      *
      * @param {HTMLElement} markerDiv - The newly created movement-marker div,
-     *                                  already appended to the speaker-area and
+     *                                  already appended to the image-area and
      *                                  positioned at the speakerDiv's current location.
      */
     addMarker(markerDiv) {

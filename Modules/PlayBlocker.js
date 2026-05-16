@@ -197,7 +197,7 @@ function PlayBlockerPageSetup() {
     dataStore = new DataStore(myIframe);
 
     // Speaker panel height (needed for column-wrap in createSpeakerDiv)
-    speakerAreaElement = document.getElementById("speaker-area");
+    speakerAreaElement = document.getElementById("image-area");
     dataStore.speakerAreaHeight = speakerAreaElement.getBoundingClientRect().height;
     speakerAreaRect = speakerAreaElement.getBoundingClientRect();
 
@@ -307,7 +307,7 @@ function insertSpeakers(spkrContainer) {
     // Layout parameters for the shadow (origin-marker) column — offset 70 px to the right
     const shadowParms = { currentX: 70, currentY: 0, yIncrement: 30, bottomOfColumnY: 0, topOfColumnY: 0 };
 
-    const speakerContainer = document.getElementById("speaker-area");
+    const speakerContainer = document.getElementById("image-area");
 
     speakers.forEach((speaker) => {
         // Create the draggable icon
@@ -356,7 +356,7 @@ function onResize() {
     // Ignore the synthetic resize that fires when the window first opens
     if (dataStore.speakerAreaHeight == null) return;
 
-    dataStore.speakerAreaHeight = document.getElementById("speaker-area").getBoundingClientRect().height;
+    dataStore.speakerAreaHeight = document.getElementById("image-area").getBoundingClientRect().height;
 
     stageImageElement = document.getElementById("stage-image");
     stageImageRect    = stageImageElement.getBoundingClientRect();
@@ -477,7 +477,6 @@ function parseTransform(transform) {
  * Repositions movement markers and redraws every connector chain after a resize.
  *
  * speakerDivs are already repositioned by repositionSpeakers() before this runs.
- * Shadow divs are fixed in the speaker-area and never move.
  * Movement markers were placed at a fixed point on the stage image, so they must
  * shift by exactly the same pixel delta as their speakerDiv. That delta is
  * derived from the speaker's RP and the change in the stage image geometry.
@@ -737,7 +736,7 @@ function insertMovementMarker() {
     const speakerDiv = movement.speakerDiv;
     const speakerObj = speakerObjFromSpeakerDiv(speakerDiv);
 
-    // Read the speaker's current pixel position in the speaker-area
+    // Read the speaker's current pixel position in the image-area
     const x = parseFloat(speakerDiv.getAttribute("data-x")) || 0;
     const y = parseFloat(speakerDiv.getAttribute("data-y")) || 0;
 
