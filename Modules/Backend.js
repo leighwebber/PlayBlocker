@@ -469,6 +469,8 @@ export function createMovementMarkerDiv(x, y, color, index = 0) {
     div.classList.add("movement-marker");
     div.id = `movement-marker-${index}`;
     div.style.position  = "absolute";
+    div.style.top       = "0";
+    div.style.left      = "0";
     div.style.width     = `${MARKER_RENDERED_PX}px`;
     div.style.height    = `${MARKER_RENDERED_PX}px`;
     div.style.transform = `translate(${x}px, ${y}px)`;
