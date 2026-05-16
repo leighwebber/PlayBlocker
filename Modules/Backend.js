@@ -130,33 +130,6 @@ export function createRP(ax, ay, targetImage = null, containerDiv = null) {
 }
 
 // ---------------------------------------------------------------------------
-// Colour utilities (module-private)
-// ---------------------------------------------------------------------------
-
-/**
- * Returns a lighter (pastel) version of a hex colour by interpolating toward white.
- *
- * @param {string} hex    - Six-digit hex colour, e.g. "#ff0000"
- * @param {number} factor - How far to move toward white: 0 = unchanged, 1 = pure white
- * @returns {string}
- */
-
-/**
- * Chooses black or white text for legible contrast against a background colour.
- * Uses the ITU-R BT.601 luminance formula.
- *
- * @param {string} backgroundColor - Six-digit hex colour
- * @returns {"black"|"white"}
- */
-function textColorForBackground(backgroundColor) {
-    const r = parseInt(backgroundColor.substring(1, 3), 16);
-    const g = parseInt(backgroundColor.substring(3, 5), 16);
-    const b = parseInt(backgroundColor.substring(5, 7), 16);
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-    return brightness > 128 ? "black" : "white";
-}
-
-// ---------------------------------------------------------------------------
 // Speaker
 // ---------------------------------------------------------------------------
 
