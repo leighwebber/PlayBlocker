@@ -645,6 +645,7 @@ export class Movement {
     #_pending       = true;   // True until the drop is completed
     #_span          = null;   // The <span> injected into the script DOM
     #speaker        = null;   // The Speaker (set when drag starts)
+    #_shadowRP      = null;   // Proportional position of the shadow (movement start point)
 
     /**
      * Ordered list of movement-marker divs placed along the path via the spacebar.
@@ -723,6 +724,10 @@ export class Movement {
 
     get shadowDiv()   { return this.#_shadowDiv; }
     set shadowDiv(v)  { this.#_shadowDiv = v; }
+
+    /** Proportional position of the shadow icon (the movement's start point on stage). */
+    get shadowRP()    { return this.#_shadowRP; }
+    set shadowRP(v)   { this.#_shadowRP = v; }
 
     // ── Methods ───────────────────────────────────────────────────────────
 

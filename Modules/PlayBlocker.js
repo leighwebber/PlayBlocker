@@ -434,19 +434,35 @@ function repositionSpeakers(
         speakerDiv.setAttribute("data-x", newX);
         speakerDiv.setAttribute("data-y", newY);
 
-        // *** NEW: also reposition the shadowDiv if it's been placed on stage ***
+        // Reposition the shadowDiv if it's been placed on stage.
+        // The shadow marks the movement's *start* point, which may differ from
+        // the speaker's final drop position, so we use the movement's shadowRP
+        // rather than speakerObj.RP.
         const shadowDiv = speakerObj.shadowDiv;
         if (shadowDiv && shadowDiv.isConnected && shadowDiv.parentElement === speakerAreaElement) {
-            const shadowFactors = parseTransform(shadowDiv.style.transform);
-            // Only reposition if the shadow was placed at a real position (not still
-            // in its default panel column, i.e. it has been appended during a movement)
-            const shadowX = parseFloat(shadowFactors.x) + (newPixelX - oldPixelX);
-            const shadowY = parseFloat(shadowFactors.y) + (newPixelY - oldPixelY);
-            shadowDiv.style.transform = shadowDiv.style.transform
-                .replace(shadowFactors.x, `${shadowX}px`)
-                .replace(shadowFactors.y, `${shadowY}px`);
-            shadowDiv.setAttribute("data-x", shadowX);
-            shadowDiv.setAttribute("data-y", shadowY);
+            // Find the movement that owns this shadow so we can read its shadowRP
+            let shadowRP = null;
+            dataStore.movementList.forEach((movement) => {
+                if (movement.shadowDiv === shadowDiv && movement.shadowRP) {
+                    shadowRP = movement.shadowRP;
+                }
+            });
+
+            if (shadowRP) {
+                const oldShadowPixelX = shadowRP.rX * imgWidthOld;
+                const oldShadowPixelY = shadowRP.rY * imgHeightOld;
+                const newShadowPixelX = shadowRP.rX * imgWidthNew + deltaLeft;
+                const newShadowPixelY = shadowRP.rY * imgHeightNew + deltaTop;
+
+                const shadowFactors = parseTransform(shadowDiv.style.transform);
+                const shadowX = parseFloat(shadowFactors.x) + (newShadowPixelX - oldShadowPixelX);
+                const shadowY = parseFloat(shadowFactors.y) + (newShadowPixelY - oldShadowPixelY);
+                shadowDiv.style.transform = shadowDiv.style.transform
+                    .replace(shadowFactors.x, `${shadowX}px`)
+                    .replace(shadowFactors.y, `${shadowY}px`);
+                shadowDiv.setAttribute("data-x", shadowX);
+                shadowDiv.setAttribute("data-y", shadowY);
+            }
         }
     });
 }
@@ -944,6 +960,16 @@ interact(".draggable").draggable({
                 shadowDiv.setAttribute("data-y", event.target.getAttribute("data-y"));
                 shadowDiv.style.zIndex = 100;
                 speakerAreaElement.appendChild(shadowDiv);
+
+                // Record the shadow's proportional position so it can be
+                // correctly repositioned on window resize, independently of
+                // where the speaker is eventually dropped.
+                dataStore.incompleteMovement.shadowRP = createRP(
+                    event.dragEvent.clientX,
+                    event.dragEvent.clientY,
+                    stageImageElement,
+                    imageAreaDiv
+                );
 
                 dataStore.incompleteMovement.shadowDiv = shadowDiv;
             }
