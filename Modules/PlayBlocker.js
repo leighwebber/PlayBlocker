@@ -17,19 +17,25 @@
 
 import {
     DataStore, Speaker, speakers, Movement,
-    createTextElement, createCircleElement,
+    createTextElement, 
     createSvgElement, createSpeakerDiv,
     createMovementMarkerDiv,
     MovementList, GetMovementListLog,
     createRP,
     speakerObjFromSpeakerDiv,
 } from "../Modules/Backend.js";
+
 import {
     GetCurrentPageNumber, getPreviousMovementMarker,
     GetPageNumberAtCursor, GetPageNumberAtMovement,
     GetClickedCharacterPosition, TotalPageCount,
     GoToPage
 } from "../Modules/ScriptText.js";
+
+import {
+    createCircleElement
+} from "..Modules/Icons.js";
+
 import {
     saveScript
 } from  "../Modules/Database.js";
