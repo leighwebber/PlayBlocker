@@ -364,14 +364,9 @@ function onResize() {
     );
 
     // Redraw all connector chains now that speaker positions have been updated.
-    // We also need to reposition any movement markers so they stay proportionally
-    // aligned with their speaker's path.
-    redrawMovementLines(
-        imgLeftOld, imgLeftNew,
-        imgTopOld,  imgTopNew,
-        imgWidthOld, imgWidthNew,
-        imgHeightOld, imgHeightNew
-    );
+    // Markers and shadows are fixed in the speaker-area and never move on resize;
+    // only the speakerDiv shifts (via RP). Redrawing is all that is needed.
+    redrawMovementLines();
 
     // Update "old" values for the next resize
     imgLeftOld   = imgLeftNew;
@@ -458,85 +453,16 @@ function parseTransform(transform) {
 // ---------------------------------------------------------------------------
 
 /**
- * Repositions all movement markers proportionally after a window resize, then
- * redraws every connector chain (shadowDiv → markers → speakerDiv).
+ * Redraws every connector chain (shadowDiv → markers → speakerDiv) after a resize.
  *
- * Movement markers are placed in the speaker-area at pixel positions that were
- * proportionally between the shadow and speaker at the time of placement.  When
- * the window resizes the speaker-area does not change size, but the speaker and
- * shadow positions within it may shift (they track the stage image via RP).  To
- * keep markers visually between their endpoints we compute a proportional
- * position for each marker along the shadow→speaker axis and reapply it.
- *
- * We store the proportional position (0 = at shadow, 1 = at speaker) on the
- * marker div as `data-rp` the first time it is encountered so subsequent
- * resizes can reuse it.
- *
- * @param {number} imgLeftOld
- * @param {number} imgLeftNew
- * @param {number} imgTopOld
- * @param {number} imgTopNew
- * @param {number} imgWidthOld
- * @param {number} imgWidthNew
- * @param {number} imgHeightOld
- * @param {number} imgHeightNew
+ * Shadow divs and movement markers live in the speaker-area, whose size and
+ * position do not change on window resize, so their data-x/y coordinates are
+ * always correct.  Only the speakerDiv shifts (it tracks the stage image via RP
+ * and is already repositioned by repositionSpeakers before this is called).
+ * Redrawing the lines with the updated speakerDiv position is all that is needed.
  */
-function redrawMovementLines(
-    imgLeftOld, imgLeftNew, imgTopOld, imgTopNew,
-    imgWidthOld, imgWidthNew, imgHeightOld, imgHeightNew
-) {
+function redrawMovementLines() {
     dataStore.movementList.forEach((movement) => {
-        if (!movement.speakerDiv || !movement.shadowDiv) return;
-
-        // Reposition each marker proportionally along the shadow→speaker axis
-        movement.movementMarkers.forEach((markerDiv) => {
-            const shadowX = parseFloat(movement.shadowDiv.getAttribute("data-x")) || 0;
-            const shadowY = parseFloat(movement.shadowDiv.getAttribute("data-y")) || 0;
-            const speakX  = parseFloat(movement.speakerDiv.getAttribute("data-x")) || 0;
-            const speakY  = parseFloat(movement.speakerDiv.getAttribute("data-y")) || 0;
-
-            // On first resize, record the marker's proportional position along
-            // the shadow→speaker axis so we can reuse it on subsequent resizes.
-            if (markerDiv.dataset.rp === undefined) {
-                const oldMarkerX = parseFloat(markerDiv.getAttribute("data-x")) || 0;
-                const oldMarkerY = parseFloat(markerDiv.getAttribute("data-y")) || 0;
-
-                // Compute the old shadow/speaker positions (before this resize applied)
-                // by reversing the delta that repositionSpeakers just applied.
-                const deltaX = (imgWidthNew  - imgWidthOld)  * parseFloat(movement.speaker?.RP?.rX ?? 0)
-                             + (imgLeftNew - imgLeftOld);
-                const deltaY = (imgHeightNew - imgHeightOld) * parseFloat(movement.speaker?.RP?.rY ?? 0)
-                             + (imgTopNew  - imgTopOld);
-                const oldSpeakX = speakX - deltaX;
-                const oldSpeakY = speakY - deltaY;
-
-                const axisLenX = oldSpeakX - shadowX;
-                const axisLenY = oldSpeakY - shadowY;
-                const axisLen  = Math.sqrt(axisLenX * axisLenX + axisLenY * axisLenY);
-
-                // t is how far along the shadow→speaker axis the marker sits [0..1]
-                const t = axisLen > 0
-                    ? Math.sqrt(
-                        Math.pow(oldMarkerX - shadowX, 2) +
-                        Math.pow(oldMarkerY - shadowY, 2)
-                      ) / axisLen
-                    : 0;
-
-                markerDiv.dataset.rp = t;
-            }
-
-            const t = parseFloat(markerDiv.dataset.rp);
-
-            // New marker position: interpolate between shadow and (newly repositioned) speaker
-            const newMarkerX = shadowX + t * (speakX - shadowX);
-            const newMarkerY = shadowY + t * (speakY - shadowY);
-
-            markerDiv.style.transform = `translate(${newMarkerX}px, ${newMarkerY}px)`;
-            markerDiv.setAttribute("data-x", newMarkerX);
-            markerDiv.setAttribute("data-y", newMarkerY);
-        });
-
-        // Redraw the full connector chain with all updated positions
         movement.redrawAllLines();
     });
 }
