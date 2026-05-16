@@ -26,7 +26,9 @@ import {
     GetPageNumberAtMovement, speakerObjFromSpeakerDiv,
     GetPageNumberAtCursor, getPreviousMovementMarker
 } from "../Modules/Backend.js";
-
+import {
+    GetCurrentPageNumber
+} from "../Modules/ScriptText.js";
 import {
     saveScript
 } from  "../Modules/Database.js";
