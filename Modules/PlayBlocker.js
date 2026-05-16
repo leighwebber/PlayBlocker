@@ -34,7 +34,7 @@ import {
 
 import {
     createCircleElement
-} from "..Modules/Icons.js";
+} from "../Modules/Icons.js";
 
 import {
     saveScript
