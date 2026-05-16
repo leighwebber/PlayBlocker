@@ -396,6 +396,7 @@ function onResize() {
  * @param {number} imgHeightOld - Image height before resize
  * @param {number} imgHeightNew - Image height after resize
  */
+
 function repositionSpeakers(
     imgLeftOld, imgLeftNew, imgTopOld, imgTopNew,
     imgWidthOld, imgWidthNew, imgHeightOld, imgHeightNew
@@ -407,33 +408,40 @@ function repositionSpeakers(
     speakerDivs.forEach((speakerDiv) => {
         const speakerObj = speakerObjFromSpeakerDiv(speakerDiv);
 
-        // Only reposition icons that have been placed on the stage image (have an RP)
         if (!speakerObj.RP) return;
 
-        // Pixel distance from the image's top-left at the OLD size
         const oldPixelX = speakerObj.RP.rX * imgWidthOld;
         const oldPixelY = speakerObj.RP.rY * imgHeightOld;
-
-        // Pixel distance at the NEW size, plus any shift in the image's position
         const newPixelX = speakerObj.RP.rX * imgWidthNew + deltaLeft;
         const newPixelY = speakerObj.RP.rY * imgHeightNew + deltaTop;
 
-        // Apply the delta to the existing CSS transform
+        // Reposition the speakerDiv (existing logic)
         const oldFactors = parseTransform(speakerDiv.style.transform);
         const newX = parseFloat(oldFactors.x) + (newPixelX - oldPixelX);
         const newY = parseFloat(oldFactors.y) + (newPixelY - oldPixelY);
-
-        // Replace the translate values in the transform string
-        let newTransform = speakerDiv.style.transform
+        speakerDiv.style.transform = speakerDiv.style.transform
             .replace(oldFactors.x, `${newX}px`)
             .replace(oldFactors.y, `${newY}px`);
-        speakerDiv.style.transform = newTransform;
-
-        // Sync Interact.js's internal position tracking
         speakerDiv.setAttribute("data-x", newX);
         speakerDiv.setAttribute("data-y", newY);
+
+        // *** NEW: also reposition the shadowDiv if it's been placed on stage ***
+        const shadowDiv = speakerObj.shadowDiv;
+        if (shadowDiv && shadowDiv.isConnected && shadowDiv.parentElement === speakerAreaElement) {
+            const shadowFactors = parseTransform(shadowDiv.style.transform);
+            // Only reposition if the shadow was placed at a real position (not still
+            // in its default panel column, i.e. it has been appended during a movement)
+            const shadowX = parseFloat(shadowFactors.x) + (newPixelX - oldPixelX);
+            const shadowY = parseFloat(shadowFactors.y) + (newPixelY - oldPixelY);
+            shadowDiv.style.transform = shadowDiv.style.transform
+                .replace(shadowFactors.x, `${shadowX}px`)
+                .replace(shadowFactors.y, `${shadowY}px`);
+            shadowDiv.setAttribute("data-x", shadowX);
+            shadowDiv.setAttribute("data-y", shadowY);
+        }
     });
 }
+
 
 // ---------------------------------------------------------------------------
 // CSS transform parser
