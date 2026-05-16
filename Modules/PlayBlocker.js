@@ -363,10 +363,14 @@ function onResize() {
         imgHeightOld, imgHeightNew
     );
 
-    // Redraw all connector chains now that speaker positions have been updated.
-    // Markers and shadows are fixed in the speaker-area and never move on resize;
-    // only the speakerDiv shifts (via RP). Redrawing is all that is needed.
-    redrawMovementLines();
+    // Reposition markers and redraw all connector chains now that speaker
+    // positions have been updated.
+    redrawMovementLines(
+        imgLeftOld, imgLeftNew,
+        imgTopOld,  imgTopNew,
+        imgWidthOld, imgWidthNew,
+        imgHeightOld, imgHeightNew
+    );
 
     // Update "old" values for the next resize
     imgLeftOld   = imgLeftNew;
@@ -453,16 +457,52 @@ function parseTransform(transform) {
 // ---------------------------------------------------------------------------
 
 /**
- * Redraws every connector chain (shadowDiv → markers → speakerDiv) after a resize.
+ * Repositions movement markers and redraws every connector chain after a resize.
  *
- * Shadow divs and movement markers live in the speaker-area, whose size and
- * position do not change on window resize, so their data-x/y coordinates are
- * always correct.  Only the speakerDiv shifts (it tracks the stage image via RP
- * and is already repositioned by repositionSpeakers before this is called).
- * Redrawing the lines with the updated speakerDiv position is all that is needed.
+ * speakerDivs are already repositioned by repositionSpeakers() before this runs.
+ * Shadow divs are fixed in the speaker-area and never move.
+ * Movement markers were placed at a fixed point on the stage image, so they must
+ * shift by exactly the same pixel delta as their speakerDiv. That delta is
+ * derived from the speaker's RP and the change in the stage image geometry.
+ *
+ * @param {number} imgLeftOld
+ * @param {number} imgLeftNew
+ * @param {number} imgTopOld
+ * @param {number} imgTopNew
+ * @param {number} imgWidthOld
+ * @param {number} imgWidthNew
+ * @param {number} imgHeightOld
+ * @param {number} imgHeightNew
  */
-function redrawMovementLines() {
+function redrawMovementLines(
+    imgLeftOld, imgLeftNew, imgTopOld, imgTopNew,
+    imgWidthOld, imgWidthNew, imgHeightOld, imgHeightNew
+) {
+    const deltaLeft = imgLeftNew - imgLeftOld;
+    const deltaTop  = imgTopNew  - imgTopOld;
+
     dataStore.movementList.forEach((movement) => {
+        if (!movement.speakerDiv || !movement.shadowDiv) return;
+
+        const rp = movement.speaker?.RP;
+        if (rp && movement.movementMarkers.length > 0) {
+            // The same delta that repositionSpeakers applied to the speakerDiv
+            const oldPixelX = rp.rX * imgWidthOld;
+            const oldPixelY = rp.rY * imgHeightOld;
+            const newPixelX = rp.rX * imgWidthNew + deltaLeft;
+            const newPixelY = rp.rY * imgHeightNew + deltaTop;
+            const dx = newPixelX - oldPixelX;
+            const dy = newPixelY - oldPixelY;
+
+            movement.movementMarkers.forEach((markerDiv) => {
+                const x = parseFloat(markerDiv.getAttribute("data-x")) + dx;
+                const y = parseFloat(markerDiv.getAttribute("data-y")) + dy;
+                markerDiv.style.transform = `translate(${x}px, ${y}px)`;
+                markerDiv.setAttribute("data-x", x);
+                markerDiv.setAttribute("data-y", y);
+            });
+        }
+
         movement.redrawAllLines();
     });
 }
