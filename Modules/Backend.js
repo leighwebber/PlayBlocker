@@ -576,12 +576,6 @@ export function speakerObjFromSpeakerDiv(speakerDiv) {
  * @param {HTMLIFrameElement} myIframe
  * @returns {number}
  */
-export function TotalPageCount(myIframe) {
-    const innerDoc   = myIframe.contentDocument || myIframe.contentWindow.document;
-    const pageBreaks = innerDoc.querySelectorAll(".PageBreak");
-    if (!pageBreaks.length) return 0;
-    return parseInt(pageBreaks[pageBreaks.length - 1].innerText.split("Page").pop(), 10);
-}
 
 /**
  * Scrolls the iframe to bring the given page number into view.
@@ -589,16 +583,6 @@ export function TotalPageCount(myIframe) {
  * @param {HTMLIFrameElement} myIframe
  * @param {number}            pageNumber
  */
-export function GoToPage(myIframe, pageNumber) {
-    const innerDoc   = myIframe.contentDocument || myIframe.contentWindow.document;
-    const pageBreaks = Array.from(innerDoc.querySelectorAll(".PageBreak"));
-    const target     = pageBreaks.find((el) => el.innerText.includes(String(pageNumber)));
-    if (target) {
-        target.scrollIntoView({ behavior: "auto", block: "start" });
-    } else {
-        console.warn(`GoToPage: no PageBreak found for page ${pageNumber}`);
-    }
-}
 
 /**
  * Returns the page number of the page that contains a given Movement's DOM node.
@@ -607,14 +591,6 @@ export function GoToPage(myIframe, pageNumber) {
  * @param {Movement} movement
  * @returns {number|null}
  */
-export function GetPageNumberAtMovement(movement) {
-    let el = movement.node.parentElement;
-    while (el && el.className !== "PageBreak") {
-        el = el.previousElementSibling;
-        if (!el || el.tagName.toUpperCase() === "BODY") return null;
-    }
-    return el ? parseInt(el.innerText.split("Page").pop(), 10) : null;
-}
 
 /**
  * Returns the page number at the element the user clicked.
@@ -657,27 +633,6 @@ export function GetPageNumberAtMovement(movement) {
  * @param {HTMLIFrameElement} iFrame
  * @returns {number} Character offset, or 0 on failure
  */
-export function GetClickedCharacterPosition(iFrame) {
-    const doc   = iFrame.contentDocument;
-    const range = doc.caretRangeFromPoint(event.clientX, event.clientY);
-    if (!range) return 0;
-
-    const textNode = range.startContainer;
-    const offset   = range.startOffset;
-
-    if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-        let total = offset;
-        let node  = textNode;
-        while (node.previousSibling) {
-            node   = node.previousSibling;
-            total += node.textContent.length;
-        }
-        return total;
-    }
-
-    console.error("GetClickedCharacterPosition: click was not inside a text node.");
-    return 0;
-}
 
 // ---------------------------------------------------------------------------
 // HTML offset mapping (module-private)
