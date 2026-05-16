@@ -21,13 +21,13 @@ import {
     createSvgElement, createSpeakerDiv,
     createMovementMarkerDiv,
     MovementList, GetMovementListLog,
-    GetCurrentPageNumber, TotalPageCount, GoToPage,
+    TotalPageCount, GoToPage,
     GetClickedCharacterPosition, createRP,
     GetPageNumberAtMovement, speakerObjFromSpeakerDiv,
-    GetPageNumberAtCursor, getPreviousMovementMarker
+    GetPageNumberAtCursor
 } from "../Modules/Backend.js";
 import {
-    GetCurrentPageNumber
+    GetCurrentPageNumber, getPreviousMovementMarker
 } from "../Modules/ScriptText.js";
 import {
     saveScript

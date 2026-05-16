@@ -656,23 +656,7 @@ export function GetPageNumberAtCursor(iFrame, e) {
  * @param {DataStore}         dataStore
  * @returns {HTMLSpanElement|null}
  */
-export function getPreviousMovementMarker(e, myIframe, dataStore) {
-    const para  = e.target;
-    const spans = para.querySelectorAll("span");
-    if (!spans.length) return null;
 
-    const sel = myIframe.contentWindow.getSelection();
-    if (!sel.rangeCount) return null;
-    const cursorOffset = sel.anchorOffset;
-
-    // Walk spans right-to-left; return the first one whose HTML offset is before the cursor
-    for (let i = spans.length - 1; i >= 0; i--) {
-        const span       = spans[i];
-        const charOffset = para.innerHTML.indexOf(span.outerHTML) - 5;
-        if (charOffset <= cursorOffset) return span;
-    }
-    return null;
-}
 
 // ---------------------------------------------------------------------------
 // Clicked-character position
