@@ -624,20 +624,6 @@ export function GetPageNumberAtMovement(movement) {
  * @param {MouseEvent}        e
  * @returns {number|null}
  */
-export function GetPageNumberAtCursor(iFrame, e) {
-    const clicked = e.target;
-    if (clicked.tagName.toUpperCase() === "BODY") {
-        console.warn("GetPageNumberAtCursor: click landed on <body>.");
-        return null;
-    }
-
-    let el = clicked;
-    while (el && el.className !== "PageBreak") {
-        el = el.previousElementSibling;
-        if (!el || el.nodeName.toUpperCase() === "BODY") return 0;
-    }
-    return el ? parseInt(el.innerText.split("Page").pop(), 10) : 0;
-}
 
 /**
  * Returns the page number currently visible at the top of the iframe viewport.

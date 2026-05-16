@@ -24,10 +24,10 @@ import {
     TotalPageCount, GoToPage,
     GetClickedCharacterPosition, createRP,
     GetPageNumberAtMovement, speakerObjFromSpeakerDiv,
-    GetPageNumberAtCursor
 } from "../Modules/Backend.js";
 import {
-    GetCurrentPageNumber, getPreviousMovementMarker
+    GetCurrentPageNumber, getPreviousMovementMarker,
+    GetPageNumberAtCursor
 } from "../Modules/ScriptText.js";
 import {
     saveScript
