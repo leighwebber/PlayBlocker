@@ -19,6 +19,7 @@ import {
     DataStore, Speaker, speakers, Movement,
     createTextElement, createCircleElement,
     createSvgElement, createSpeakerDiv,
+    createMovementMarkerDiv,
     MovementList, GetMovementListLog,
     GetCurrentPageNumber, TotalPageCount, GoToPage,
     GetClickedCharacterPosition, createRP,
@@ -32,6 +33,12 @@ import {
 // ---------------------------------------------------------------------------
 // Module-level state
 // ---------------------------------------------------------------------------
+
+/** True while an Interact.js drag is actively in progress. */
+let isDragging = false;
+
+/** Sequential counter for movement-marker element ids. */
+let markerCount = 0;
 
 /** Initials of the most recently dragged speaker — used to reset its z-index. */
 let lastMovedSpeakerInitials = null;
@@ -599,12 +606,18 @@ function iFrameOnScroll() {
 
 /**
  * Global keydown handler: arrow keys scroll the script, PageUp/PageDown jump
- * between page breaks, and Escape cancels an in-progress movement.
+ * between page breaks, Escape cancels an in-progress movement, and Space
+ * drops a movement marker at the current drag position.
  *
  * @param {KeyboardEvent} event
  */
 function handleKeyDown(event) {
     switch (event.key) {
+        case " ":
+            // Prevent the page from scrolling on spacebar
+            event.preventDefault();
+            insertMovementMarker();
+            break;
         case "Escape":
             handleEscapeKey();
             break;
@@ -621,6 +634,48 @@ function handleKeyDown(event) {
             scrollToAdjacentPage("down");
             break;
     }
+}
+
+/**
+ * Inserts a movement marker at the speaker's current drag position.
+ *
+ * Called when the user presses spacebar while dragging a speaker icon.
+ * The marker is a small coloured square placed at the same pixel position as
+ * the speakerDiv at the moment spacebar is pressed.  A permanent connector
+ * line is drawn from the previous waypoint (shadow or last marker) to the new
+ * marker, and subsequent drag-move events will trail a live line from the
+ * marker to the moving speakerDiv.
+ *
+ * Does nothing if no drag is currently in progress.
+ */
+function insertMovementMarker() {
+    if (!isDragging || !dataStore.incompleteMovement) return;
+
+    const movement   = dataStore.incompleteMovement;
+    const speakerDiv = movement.speakerDiv;
+    const speakerObj = speakerObjFromSpeakerDiv(speakerDiv);
+
+    // Read the speaker's current pixel position in the speaker-area
+    const x = parseFloat(speakerDiv.getAttribute("data-x")) || 0;
+    const y = parseFloat(speakerDiv.getAttribute("data-y")) || 0;
+
+    // Offset so the marker's centre aligns with the speaker circle's centre
+    // Speaker icon: 30 px wide, circle centre at 50 % → 15 px from left edge
+    // Marker square: 10 px wide, centre at 5 px from left edge
+    const markerX = x + 15 - 5;
+    const markerY = y + 15 - 5;
+
+    const markerDiv = createMovementMarkerDiv(
+        markerX,
+        markerY,
+        speakerObj.backgroundColor,
+        markerCount++
+    );
+
+    speakerAreaElement.appendChild(markerDiv);
+
+    // Freeze the segment to this marker and start trailing from it
+    movement.addMarker(markerDiv);
 }
 
 /**
@@ -782,6 +837,8 @@ interact(".draggable").draggable({
          * set up the shadow icon at the drag origin.
          */
         start(event) {
+            isDragging = true;
+
             // Store the pre-drag transform so we can restore it if the drop is invalid
             event.target.originalTransform = event.target.style.transform;
 
@@ -843,6 +900,8 @@ interact(".draggable").draggable({
          * its pre-drag position.
          */
         end(event) {
+            isDragging = false;
+
             if (event.target.onImage) {
                 // Dropped successfully on stage — leave it where it landed
                 return;

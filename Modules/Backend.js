@@ -398,17 +398,45 @@ export function createTextElement(aSpeaker, isShadow) {
 }
 
 // ---------------------------------------------------------------------------
-// SVG line drawing — speaker-to-shadow connector
+// SVG line drawing — speaker-to-shadow connector and movement-marker chain
 // ---------------------------------------------------------------------------
+
+/** Size of the rendered SVG for speaker/shadow icons, in pixels. */
+const ICON_RENDERED_PX  = 30;
+
+/** ViewBox size of speaker/shadow SVGs. */
+const ICON_VIEWBOX_SIZE = 100;
+
+/** Rendered pixel size of a movement-marker div/SVG. */
+const MARKER_RENDERED_PX  = 10;
+
+/** ViewBox size of movement-marker SVGs. */
+const MARKER_VIEWBOX_SIZE = 10;
+
+/**
+ * Returns the local-centre coordinates (in viewBox units) for a div that
+ * participates in the connector chain.
+ *
+ * Speaker/shadow divs use a 100×100 viewBox with the circle at (50, 50).
+ * Movement-marker divs use a 10×10 viewBox with the square at (5, 5).
+ *
+ * @param {HTMLElement} div
+ * @returns {{ cx: number, cy: number, renderedPx: number, viewBoxSize: number }}
+ */
+function divGeometry(div) {
+    if (div.classList.contains("movement-marker")) {
+        return { cx: 5, cy: 5, renderedPx: MARKER_RENDERED_PX, viewBoxSize: MARKER_VIEWBOX_SIZE };
+    }
+    return { cx: 50, cy: 50, renderedPx: ICON_RENDERED_PX, viewBoxSize: ICON_VIEWBOX_SIZE };
+}
 
 /**
  * Creates an SVG `<path>` representing a straight line between two points.
- * Used to draw the connector from a speaker's current position to their shadow.
  *
- * @param {number} x1 - Start X (SVG viewBox units)
- * @param {number} y1 - Start Y
- * @param {number} x2 - End X
- * @param {number} y2 - End Y
+ * @param {number} x1
+ * @param {number} y1
+ * @param {number} x2
+ * @param {number} y2
  * @returns {SVGPathElement}
  */
 function createPath(x1, y1, x2, y2) {
@@ -420,30 +448,105 @@ function createPath(x1, y1, x2, y2) {
 }
 
 /**
- * Removes any existing connector line from inside a speaker div's SVG child.
+ * Removes any existing connector line from inside a div's SVG child.
  *
- * @param {HTMLElement} speakerDiv
+ * @param {HTMLElement} div - A speaker div, shadow div, or movement-marker div
  */
-function eraseLine(speakerDiv) {
-    speakerDiv.querySelector("svg")?.querySelector("path")?.remove();
+function eraseLine(div) {
+    div.querySelector("svg")?.querySelector("path")?.remove();
 }
 
 /**
- * Draws a line inside `fromDiv`'s SVG child, from its centre to `toDiv`'s centre.
- * Coordinates are expressed as a delta so they work within the SVG's local space.
+ * Draws a connector line inside `fromDiv`'s SVG, from its local centre point
+ * toward `toDiv`'s centre point.
  *
- * @param {HTMLElement} fromDiv - Origin div (line is drawn inside its SVG)
- * @param {HTMLElement} toDiv   - Destination div (the shadow)
+ * Both divs share the same positioned parent and are located by their
+ * `data-x` / `data-y` pixel attributes.  The line is expressed in `fromDiv`'s
+ * SVG viewBox coordinate space, so pixel distances are scaled accordingly.
+ *
+ * Works for any combination of speaker divs (viewBox 100×100, rendered 30 px)
+ * and movement-marker divs (viewBox 10×10, rendered 10 px).
+ *
+ * @param {HTMLElement} fromDiv
+ * @param {HTMLElement} toDiv
  */
 function drawLine(fromDiv, toDiv) {
-    const fromTransform = fromDiv.attributeStyleMap.get("transform");
-    const toTransform   = toDiv.attributeStyleMap.get("transform");
+    const fromGeo = divGeometry(fromDiv);
+    const toGeo   = divGeometry(toDiv);
 
-    const xDelta = toTransform[0].x.value - fromTransform[0].x.value;
-    const yDelta = toTransform[0].y.value - fromTransform[0].y.value;
+    const fromX = parseFloat(fromDiv.getAttribute("data-x")) || 0;
+    const fromY = parseFloat(fromDiv.getAttribute("data-y")) || 0;
+    const toX   = parseFloat(toDiv.getAttribute("data-x"))   || 0;
+    const toY   = parseFloat(toDiv.getAttribute("data-y"))   || 0;
 
-    // Line starts at the SVG centre (50, 50) and ends at the delta offset
-    fromDiv.querySelector("svg").appendChild(createPath(50, 50, xDelta, yDelta));
+    // Pixel position of each div's visual centre within the shared parent
+    const fromCentrePixelX = fromX + fromGeo.renderedPx / 2;
+    const fromCentrePixelY = fromY + fromGeo.renderedPx / 2;
+    const toCentrePixelX   = toX   + toGeo.renderedPx   / 2;
+    const toCentrePixelY   = toY   + toGeo.renderedPx   / 2;
+
+    // Convert the pixel delta into fromDiv's viewBox units
+    const scale = fromGeo.viewBoxSize / fromGeo.renderedPx;
+    const x2 = fromGeo.cx + (toCentrePixelX - fromCentrePixelX) * scale;
+    const y2 = fromGeo.cy + (toCentrePixelY - fromCentrePixelY) * scale;
+
+    fromDiv.querySelector("svg").appendChild(createPath(fromGeo.cx, fromGeo.cy, x2, y2));
+}
+
+// ---------------------------------------------------------------------------
+// Movement marker
+// ---------------------------------------------------------------------------
+
+/**
+ * Creates a small square "movement marker" div positioned at the given pixel
+ * coordinates within the speaker area.
+ *
+ * The div contains a tiny SVG (10×10 viewBox, 10×10 px rendered) with
+ * `overflow="visible"` so connector lines can extend beyond its bounds.
+ * It receives the CSS class `movement-marker` so `divGeometry()` can
+ * distinguish it from speaker/shadow divs.
+ *
+ * @param {number} x       - `data-x` pixel position (translate X) in the parent
+ * @param {number} y       - `data-y` pixel position (translate Y) in the parent
+ * @param {string} color   - Fill colour for the square (matches the speaker)
+ * @param {number} [index] - Sequential index used for the element id
+ * @returns {HTMLDivElement}
+ */
+export function createMovementMarkerDiv(x, y, color, index = 0) {
+    const svgNS = "http://www.w3.org/2000/svg";
+
+    // Outer div — same positioning contract as speaker/shadow divs
+    const div = document.createElement("div");
+    div.classList.add("movement-marker");
+    div.id = `movement-marker-${index}`;
+    div.style.position  = "absolute";
+    div.style.width     = `${MARKER_RENDERED_PX}px`;
+    div.style.height    = `${MARKER_RENDERED_PX}px`;
+    div.style.transform = `translate(${x}px, ${y}px)`;
+    div.setAttribute("data-x", x);
+    div.setAttribute("data-y", y);
+    div.style.zIndex    = "200";
+    div.style.pointerEvents = "none";
+
+    // SVG containing a small filled square
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("width",    `${MARKER_RENDERED_PX}px`);
+    svg.setAttribute("height",   `${MARKER_RENDERED_PX}px`);
+    svg.setAttribute("viewBox",  `0 0 ${MARKER_VIEWBOX_SIZE} ${MARKER_VIEWBOX_SIZE}`);
+    svg.setAttribute("overflow", "visible");
+
+    const rect = document.createElementNS(svgNS, "rect");
+    rect.setAttribute("x",      "1");
+    rect.setAttribute("y",      "1");
+    rect.setAttribute("width",  "8");
+    rect.setAttribute("height", "8");
+    rect.setAttribute("fill",   color);
+    rect.setAttribute("stroke", "black");
+    rect.setAttribute("stroke-width", "0.5");
+
+    svg.appendChild(rect);
+    div.appendChild(svg);
+    return div;
 }
 
 // ---------------------------------------------------------------------------
@@ -688,6 +791,13 @@ export class Movement {
     #speaker        = null;   // The Speaker (set when drag starts)
 
     /**
+     * Ordered list of movement-marker divs placed along the path via the spacebar.
+     * Index 0 is the marker closest to the shadow; the last entry is closest to the speaker.
+     * @type {HTMLElement[]}
+     */
+    movementMarkers = [];
+
+    /**
      * @param {HTMLIFrameElement} iFrame
      * @param {HTMLElement}       imageAreaDiv      - The div wrapping the stage image
      * @param {DataStore}         dataStore
@@ -761,12 +871,51 @@ export class Movement {
     // ── Methods ───────────────────────────────────────────────────────────
 
     /**
-     * Redraws the connector line from the speaker div to the shadow div.
+     * Redraws the full connector chain each time the speaker is moved.
+     *
+     * Chain order: shadowDiv → marker[0] → marker[1] → … → marker[n] → speakerDiv
+     *
+     * Each segment is drawn inside the *from* div's SVG (which has overflow="visible"),
+     * so only the leading line (from the last waypoint to the speaker) needs erasing
+     * and redrawing on every move event.  Lines between fixed waypoints are permanent
+     * once drawn and never erased.
+     *
      * Called on every drag-move event while a movement is in progress.
      */
     drawLines() {
-        eraseLine(this.speakerDiv);
-        drawLine(this.speakerDiv, this.shadowDiv);
+        // The final leg is always from the last fixed waypoint to the moving speakerDiv.
+        // Erase and redraw only that segment.
+        const lastFixed = this.movementMarkers.length > 0
+            ? this.movementMarkers[this.movementMarkers.length - 1]
+            : this.shadowDiv;
+
+        eraseLine(lastFixed);
+        drawLine(lastFixed, this.speakerDiv);
+    }
+
+    /**
+     * Called when the user presses spacebar during a drag.
+     * Freezes the current speakerDiv position as a new movement marker, draws the
+     * permanent segment from the previous waypoint to the new marker, and hands the
+     * live trailing line off to the new marker.
+     *
+     * @param {HTMLElement} markerDiv - The newly created movement-marker div,
+     *                                  already appended to the speaker-area and
+     *                                  positioned at the speakerDiv's current location.
+     */
+    addMarker(markerDiv) {
+        const prevFixed = this.movementMarkers.length > 0
+            ? this.movementMarkers[this.movementMarkers.length - 1]
+            : this.shadowDiv;
+
+        // Erase the live trailing line that was running from prevFixed → speakerDiv
+        eraseLine(prevFixed);
+
+        // Draw the now-permanent segment from the previous waypoint to the new marker
+        drawLine(prevFixed, markerDiv);
+
+        // Register the marker; the next drawLines() call will trail from it
+        this.movementMarkers.push(markerDiv);
     }
 }
 
