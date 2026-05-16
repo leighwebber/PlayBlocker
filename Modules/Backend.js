@@ -14,7 +14,7 @@
  */
 
 import { colorNames } from "../Modules/colors.js";
-
+import { createCircleElement} from "../Modules/Icons.js";
 // ---------------------------------------------------------------------------
 // Global state
 // ---------------------------------------------------------------------------
@@ -140,18 +140,6 @@ export function createRP(ax, ay, targetImage = null, containerDiv = null) {
  * @param {number} factor - How far to move toward white: 0 = unchanged, 1 = pure white
  * @returns {string}
  */
-function getPalerColorHex(hex, factor = 0.5) {
-    let r = parseInt(hex.slice(1, 3), 16);
-    let g = parseInt(hex.slice(3, 5), 16);
-    let b = parseInt(hex.slice(5, 7), 16);
-
-    r = Math.round(r + (255 - r) * factor);
-    g = Math.round(g + (255 - g) * factor);
-    b = Math.round(b + (255 - b) * factor);
-
-    const toHex = (c) => c.toString(16).padStart(2, "0");
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
 
 /**
  * Chooses black or white text for legible contrast against a background colour.

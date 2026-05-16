@@ -18,3 +18,15 @@ export function createCircleElement(aSpeaker, isShadow) {
 
     return circle;
 }
+function getPalerColorHex(hex, factor = 0.5) {
+    let r = parseInt(hex.slice(1, 3), 16);
+    let g = parseInt(hex.slice(3, 5), 16);
+    let b = parseInt(hex.slice(5, 7), 16);
+
+    r = Math.round(r + (255 - r) * factor);
+    g = Math.round(g + (255 - g) * factor);
+    b = Math.round(b + (255 - b) * factor);
+
+    const toHex = (c) => c.toString(16).padStart(2, "0");
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
