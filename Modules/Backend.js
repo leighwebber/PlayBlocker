@@ -14,7 +14,7 @@
  */
 
 import { colorNames } from "../Modules/colors.js";
-import { createCircleElement} from "../Modules/Icons.js";
+import { createCircleElement, textColorForBackground, getPalerColorHex } from "../Modules/Icons.js";
 // ---------------------------------------------------------------------------
 // Global state
 // ---------------------------------------------------------------------------

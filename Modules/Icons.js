@@ -18,7 +18,7 @@ export function createCircleElement(aSpeaker, isShadow) {
 
     return circle;
 }
-function getPalerColorHex(hex, factor = 0.5) {
+export function getPalerColorHex(hex, factor = 0.5) {
     let r = parseInt(hex.slice(1, 3), 16);
     let g = parseInt(hex.slice(3, 5), 16);
     let b = parseInt(hex.slice(5, 7), 16);
@@ -51,7 +51,7 @@ function getPalerColorHex(hex, factor = 0.5) {
  * @param {string} backgroundColor - Six-digit hex colour
  * @returns {"black"|"white"}
  */
-function textColorForBackground(backgroundColor) {
+export function textColorForBackground(backgroundColor) {
     const r = parseInt(backgroundColor.substring(1, 3), 16);
     const g = parseInt(backgroundColor.substring(3, 5), 16);
     const b = parseInt(backgroundColor.substring(5, 7), 16);
