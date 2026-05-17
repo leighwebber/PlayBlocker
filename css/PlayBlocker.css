@@ -99,11 +99,16 @@ iframe {
   font-family: sans-serif;
   text-align: center;
   position: absolute;
-  top: 30;
-  right: 20;
+  top: 30px;
+  right: 20px;
   /* User interaction */
   cursor: pointer;
   user-select: none; /* Prevents text highlighting on double-click */
+}
+#saveScript {
+  position: absolute;
+  top: 30px;
+  right: 115px;
 }
 .app-title  {
   font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
