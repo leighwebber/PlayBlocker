@@ -415,6 +415,11 @@ function repositionSpeakers(
     const deltaTop    = imgTopNew  - imgTopOld;
 
     speakerDivs.forEach((speakerDiv) => {
+        // Shadow divs share the .speaker class but must not be processed here —
+        // they are repositioned below using their own shadowRP.
+        // Processing them here would apply the delta a second time (acceleration bug).
+        if (speakerDiv.id.startsWith("shadow-div-")) return;
+
         const speakerObj = speakerObjFromSpeakerDiv(speakerDiv);
 
         if (!speakerObj.RP) return;
@@ -518,15 +523,17 @@ function redrawMovementLines(
 
         const rp = movement.speaker?.RP;
         if (rp && movement.movementMarkers.length > 0) {
-            // The same delta that repositionSpeakers applied to the speakerDiv
-            const oldPixelX = rp.rX * imgWidthOld;
-            const oldPixelY = rp.rY * imgHeightOld;
-            const newPixelX = rp.rX * imgWidthNew + deltaLeft;
-            const newPixelY = rp.rY * imgHeightNew + deltaTop;
-            const dx = newPixelX - oldPixelX;
-            const dy = newPixelY - oldPixelY;
-
             movement.movementMarkers.forEach((markerDiv) => {
+                // Each marker has its own RP stored at creation time.
+                // Fall back to the speaker's RP only if somehow absent.
+                const markerRp = markerDiv._rp || rp;
+                const oldMarkerPixelX = markerRp.rX * imgWidthOld;
+                const oldMarkerPixelY = markerRp.rY * imgHeightOld;
+                const newMarkerPixelX = markerRp.rX * imgWidthNew + deltaLeft;
+                const newMarkerPixelY = markerRp.rY * imgHeightNew + deltaTop;
+                const dx = newMarkerPixelX - oldMarkerPixelX;
+                const dy = newMarkerPixelY - oldMarkerPixelY;
+
                 const x = parseFloat(markerDiv.getAttribute("data-x")) + dx;
                 const y = parseFloat(markerDiv.getAttribute("data-y")) + dy;
                 markerDiv.style.transform = `translate(${x}px, ${y}px)`;
@@ -767,6 +774,21 @@ function insertMovementMarker() {
         markerY,
         speakerObj.backgroundColor,
         markerCount++
+    );
+
+    // Store the marker's proportional position on the stage image so that
+    // redrawMovementLines() can reposition it correctly on window resize.
+    // markerX/Y are offsets from #image-area top-left; we subtract the image's
+    // own offset within that container to get coordinates relative to the image,
+    // then divide by image dimensions to get fractions [0,1].
+    const imageAreaRect  = imageAreaDiv.getBoundingClientRect();
+    const imgOffsetLeft  = stageImageRect.left - imageAreaRect.left;
+    const imgOffsetTop   = stageImageRect.top  - imageAreaRect.top;
+    // Use the marker's centre (markerX+5, markerY+5) relative to the image
+    markerDiv._rp = createRP(
+        markerX + 5 - imgOffsetLeft,
+        markerY + 5 - imgOffsetTop,
+        stageImageElement          // 3-arg form: pixel offsets → proportional
     );
 
     speakerAreaElement.appendChild(markerDiv);
