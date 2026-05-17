@@ -293,17 +293,17 @@ async function playBlockerPageSetup() {
 async function insertSpeakers(speakerContainer) {
     // Hard-coded fallback cast for "And Then There Were None"
     const fallbackCast = [
-        ["Lombard",    "LO", "green"],
-        ["Marston",    "MA", "blue"],
-        ["Claythorne", "CL", "pink"],
-        ["Wargrave",   "WA", "orange"],
-        ["Blore",      "BL", "purple"],
-        ["McKenzie",   "MK", "cyan"],
-        ["Armstrong",  "AR", "yellow"],
-        ["Rogers",     "RO", "brown"],
-        ["Mrs Rogers", "RS", "lightgray"],
-        ["Narracot",   "NA", "black"],
-        ["Brent",      "BR", "violet"],
+        ["Philip", "Lombard",    "LO", "green"],
+        ["Anthony", "Marston",    "MA", "blue"],
+        ["Vera", "Claythorne", "CL", "pink"],
+        ["Lawrence", "Wargrave",   "WA", "orange"],
+        ["Henry", "Blore",      "BL", "purple"],
+        ["Arthur", "McKenzie",   "MK", "cyan"],
+        ["Margaret", "Armstrong",  "AR", "yellow"],
+        ["Ben", "Rogers",     "RO", "brown"],
+        ["Ethel", "Rogers", "RS", "lightgray"],
+        ["James", "Narracot",   "NA", "black"],
+        ["Emily", "Brent",      "BR", "violet"],
     ];
 
     // Try to load speakers from the server; fall back to the static list on any error
@@ -315,11 +315,11 @@ async function insertSpeakers(speakerContainer) {
     }
 
     const castData = serverRows.length > 0
-        ? serverRows.map((r) => [r.name, r.initials, r.color, r.id, r.rpX, r.rpY])
+        ? serverRows.map((r) => [r.first_name, r.last_name, r.initials, r.color, r.id, r.rpX, r.rpY])
         : fallbackCast.map((r) => [...r, null, null, null]);  // id, rpX, rpY all null
 
-    castData.forEach(([name, initials, color, dbId]) => {
-        speakers.push(Speaker.create(name, initials, color));
+    castData.forEach(([firstName, lastName, initials, color, dbId]) => {
+        speakers.push(Speaker.create(firstName, lastName, initials, color));
         speakers[speakers.length - 1].dbId = dbId;
     });
 
@@ -330,7 +330,7 @@ async function insertSpeakers(speakerContainer) {
 
     const container = document.getElementById("image-area");
 
-    castData.forEach(([name, initials, color, dbId, rpX, rpY], i) => {
+    castData.forEach(([firstName, lastName, initials, color, dbId, rpX, rpY], i) => {
         const speaker = speakers[i];
 
         // Restore stage position if the server returned one
