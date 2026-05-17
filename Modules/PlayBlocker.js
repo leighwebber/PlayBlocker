@@ -964,9 +964,11 @@ interact(".draggable").draggable({
                 // Record the shadow's proportional position so it can be
                 // correctly repositioned on window resize, independently of
                 // where the speaker is eventually dropped.
+                // Note: in a draggable listener, clientX/Y are on event directly
+                // (event.dragEvent only exists on dropzone DropEvents).
                 dataStore.incompleteMovement.shadowRP = createRP(
-                    event.dragEvent.clientX,
-                    event.dragEvent.clientY,
+                    event.clientX,
+                    event.clientY,
                     stageImageElement,
                     imageAreaDiv
                 );
