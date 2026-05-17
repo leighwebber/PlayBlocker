@@ -346,6 +346,46 @@ async function insertSpeakers(speakerContainer) {
         const shadowDiv = createSpeakerDiv(dataStore, speaker, shadowParams, true);
         speaker.shadowDiv = shadowDiv;
 
+        // Inside  insertSpeakers(), right after:
+        //   const shadowDiv = createSpeakerDiv(dataStore, speaker, shadowParams, true);
+
+        // --- No-entry cursor on shadowDiv during pending movement ---
+        const NO_ENTRY_CURSOR = `url("data:image/svg+xml,` +
+            `<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'>` +
+            `<circle cx='16' cy='16' r='15' fill='%23e00' stroke='white' stroke-width='2'/>` +
+            `<rect x='6' y='13' width='20' height='6' rx='3' fill='white'/>` +
+            `</svg>") 16 16, not-allowed`;
+
+        shadowDiv.addEventListener("mouseenter", () => {
+            if (dataStore.newMovement) {
+                shadowDiv.style.cursor = NO_ENTRY_CURSOR;
+            }
+        });
+        shadowDiv.addEventListener("mouseleave", () => {
+            shadowDiv.style.cursor = "";
+        });
+
+        // --- Beep and ignore clicks on shadowDiv during pending movement ---
+        shadowDiv.addEventListener("click", (e) => {
+            if (dataStore.newMovement) {
+                e.stopPropagation();
+                // AudioContext beep (works without any audio files)
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.type = "square";
+                    osc.frequency.value = 440;
+                    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+                    osc.start(ctx.currentTime);
+                    osc.stop(ctx.currentTime + 0.25);
+                } catch (_) { /* silently skip if AudioContext unavailable */ }
+            }
+        });
+
         divParams.currentY += divParams.yIncrement;
 
         container.appendChild(speakerDiv);
