@@ -73,8 +73,6 @@ export async function fetchSpeakers() {
 export async function saveSpeakers(speakers) {
     const payload = speakers.map((s) => ({
         id:       s.dbId,           // server-assigned PK, set after fetchSpeakers()
-        first_name:     s.speakerFirstName,
-        last_name:     s.speakerLastName,
         initials: s.speakerInitials,
         rpX:      s.RP?.rX ?? null,
         rpY:      s.RP?.rY ?? null,

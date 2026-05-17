@@ -1000,7 +1000,7 @@ interact(".draggable").draggable({
                     span?.remove();
                     parent?.normalize();
                     dataStore.newMovement = null;
-                    alert(`${speaker.speakerFirstName} ${speaker.speakerLastName} is not yet on stage. Drag them onto the stage image first before recording a movement.`);
+                    alert(`${speaker.FirstName} ${speaker.LastName} is not yet on stage. Drag them onto the stage image first before recording a movement.`);
                     return;
                 }
 

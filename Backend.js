@@ -158,8 +158,7 @@ export class Speaker {
     #originalY        = null;
     #speakerDiv       = null;
     #shadowDiv        = null;
-    #speakerFirstName      = "";
-    #speakerLastName      = "";
+    #speakerName      = "";
     #speakerInitials  = "";
     #backgroundColor;
     #cx               = 50;   // SVG circle centre X (in viewBox units)
@@ -231,8 +230,8 @@ export class Speaker {
     /**
      * Creates and seals a new Speaker instance.
      *
-     * @param {string} speakerFirstName - speaker first name
-     * @param {string} speakerLastName - speaker last name
+     * @param {string} speakerFirstName     - character first name, e.g. "Ethel"
+     * @param {string} speakerLastName     - character last name, e.g. "Rogers"
      * @param {string} speakerInitials - Two-letter icon label, e.g. "RS"
      * @param {string} bgColor         - CSS colour name or hex string for the icon background
      * @returns {Speaker}
