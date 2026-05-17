@@ -528,7 +528,7 @@ function getHtmlOffsetFromTextOffset(element, offset) {
     let idx      = 0;
     let remaining = offset;
 
-    while (remaining > -1 && idx < html.length) {
+    while (remaining > 0 && idx < html.length) {
         const ch = html[idx];
         if (ch === "<")           inTag = true;
         if (!inTag)               remaining -= 1;
