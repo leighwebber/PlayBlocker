@@ -10,7 +10,7 @@
  *  - MovementList:  ordered collection of Movements
  *  - RP:            proportional x/y coordinates independent of window size
  *  - DOM helpers:   createSpeakerDiv, createSvgElement, createCircleElement, createTextElement
- *  - Navigation:    GetCurrentPageNumber, TotalPageCount, GoToPage, GetPageNumberAtCursor, etc.
+ *  - Navigation:    getCurrentPageNumber, getTotalPageCount, goToPage, getPageNumberAtCursor, etc.
  */
 
 import { colorNames } from "../Modules/colors.js";
@@ -31,19 +31,19 @@ export var speakers = [];
  * All mutable app state lives here so it can be serialised / restored.
  */
 export class DataStore {
-    #script            = { filename: "", htmlContent: "" };
-    #currentPage       = null;
-    #newMovement       = null;        // A Movement waiting to be linked to a speaker
-    #incompleteMovement = null;       // A Movement linked but not yet placed on stage
-    #movementList      = null;
-    #iFrame            = null;
-    speakerAreaHeight  = null;        // Height of the speaker panel; set on init and resize
+    #script             = { filename: "", htmlContent: "" };
+    #currentPage        = null;
+    #newMovement        = null;        // A Movement waiting to be linked to a speaker
+    #incompleteMovement = null;        // A Movement linked but not yet placed on stage
+    #movementList       = null;
+    #iFrame             = null;
+    speakerAreaHeight   = null;        // Height of the speaker panel; set on init and resize
 
     /**
      * @param {HTMLIFrameElement} iFrame - The iframe that displays the script HTML.
      */
     constructor(iFrame) {
-        this.#iFrame      = iFrame;
+        this.#iFrame       = iFrame;
         this.#movementList = new MovementList(iFrame, null, this);
     }
 
@@ -120,7 +120,7 @@ export function createRP(ax, ay, targetImage = null, containerDiv = null) {
         }
 
         case 4: {
-            const rect  = targetImage.getBoundingClientRect();
+            const rect = targetImage.getBoundingClientRect();
             return createRP(ax - rect.left, ay - rect.top, targetImage);
         }
 
@@ -128,13 +128,6 @@ export function createRP(ax, ay, targetImage = null, containerDiv = null) {
             throw new Error("createRP requires 2, 3, or 4 arguments.");
     }
 }
-
-// ---------------------------------------------------------------------------
-// Colour utilities (module-private)
-// ---------------------------------------------------------------------------
-
-
-
 
 // ---------------------------------------------------------------------------
 // Speaker
@@ -150,76 +143,76 @@ export function createRP(ax, ay, targetImage = null, containerDiv = null) {
  *   speakerName / speakerInitials — identity
  *   backgroundColor / textColor   — icon colours
  *   speakerDiv / shadowDiv        — DOM elements managed by PlayBlocker.js
- *   RP                            — proportional position on the stage image (null if not placed)
+ *   rp                            — proportional position on the stage image (null if not placed)
  */
 export class Speaker {
     // Prevent `new Speaker(...)` — callers must use Speaker.create()
-    static #isInternal  = false;
+    static #isInternal   = false;
 
     // Class-level counters used for initial vertical stacking in the speaker panel
-    static #currentY    = 0;
-    static #yIncrement  = 30;
+    static #currentY     = 0;
+    static #yIncrement   = 30;
     static #speakerCount = 0;
 
-    #_originalX        = null;
-    #_originalY        = null;
-    #_speakerDiv       = null;
-    #_shadowDiv        = null;
-    #_speakerName      = "";
-    #_speakerInitials  = "";
-    #_backgroundColor;
-    #_cx               = 50;   // SVG circle centre X (in viewBox units)
-    #_cy               = 50;   // SVG circle centre Y
-    #_r                = 40;   // SVG circle radius
-    #_RP               = null; // Proportional stage position; null if not yet placed
+    #originalX        = null;
+    #originalY        = null;
+    #speakerDiv       = null;
+    #shadowDiv        = null;
+    #speakerName      = "";
+    #speakerInitials  = "";
+    #backgroundColor;
+    #cx               = 50;   // SVG circle centre X (in viewBox units)
+    #cy               = 50;   // SVG circle centre Y
+    #r                = 40;   // SVG circle radius
+    #rp               = null; // Proportional stage position; null if not yet placed
 
     // ── Getters / setters ─────────────────────────────────────────────────
 
-    get speakerDiv()       { return this.#_speakerDiv; }
-    set speakerDiv(v)      { this.#_speakerDiv = v; }
+    get speakerDiv()       { return this.#speakerDiv; }
+    set speakerDiv(v)      { this.#speakerDiv = v; }
 
-    get shadowDiv()        { return this.#_shadowDiv; }
-    set shadowDiv(v)       { this.#_shadowDiv = v; }
+    get shadowDiv()        { return this.#shadowDiv; }
+    set shadowDiv(v)       { this.#shadowDiv = v; }
 
-    get originalX()        { return this.#_originalX; }
-    set originalX(v)       { this.#_originalX = v; }
+    get originalX()        { return this.#originalX; }
+    set originalX(v)       { this.#originalX = v; }
 
-    get originalY()        { return this.#_originalY; }
-    set originalY(v)       { this.#_originalY = v; }
+    get originalY()        { return this.#originalY; }
+    set originalY(v)       { this.#originalY = v; }
 
-    get speakerName()      { return this.#_speakerName; }
-    get speakerInitials()  { return this.#_speakerInitials; }
+    get speakerName()      { return this.#speakerName; }
+    get speakerInitials()  { return this.#speakerInitials; }
 
-    get backgroundColor()  { return this.#_backgroundColor; }
-    set backgroundColor(v) { this.#_backgroundColor = v; }
+    get backgroundColor()  { return this.#backgroundColor; }
+    set backgroundColor(v) { this.#backgroundColor = v; }
 
     /** SVG circle geometry — read-only */
-    get cx() { return this.#_cx; }
-    get cy() { return this.#_cy; }
-    get r()  { return this.#_r; }
+    get cx() { return this.#cx; }
+    get cy() { return this.#cy; }
+    get r()  { return this.#r; }
 
     /**
      * Calculated text colour (black or white) for contrast against the background.
      * @returns {"black"|"white"}
      */
     get textColor() {
-        return textColorForBackground(this.#_backgroundColor);
+        return textColorForBackground(this.#backgroundColor);
     }
 
     /** Proportional position on the stage image, or null if not yet placed. */
-    get RP()  { return this.#_RP; }
-    set RP(v) { this.#_RP = v; }
+    get RP()  { return this.#rp; }
+    set RP(v) { this.#rp = v; }
 
     // ── Constructor (private) ─────────────────────────────────────────────
 
-    constructor(spkrName, spkrInitials, bgColor) {
+    constructor(speakerName, speakerInitials, bgColor) {
         if (!Speaker.#isInternal) {
             throw new Error("Use Speaker.create() — do not call new Speaker() directly.");
         }
-        this.#_speakerName     = spkrName;
-        this.#_speakerInitials = spkrInitials;
+        this.#speakerName     = speakerName;
+        this.#speakerInitials = speakerInitials;
         // Accept a CSS colour name (e.g. "green") or a hex string (e.g. "#008000")
-        this.#_backgroundColor = colorNames[bgColor.toLowerCase()] || bgColor;
+        this.#backgroundColor = colorNames[bgColor.toLowerCase()] || bgColor;
 
         Speaker.#currentY    += Speaker.#yIncrement;
         Speaker.#speakerCount += 1;
@@ -230,15 +223,15 @@ export class Speaker {
     /**
      * Creates and seals a new Speaker instance.
      *
-     * @param {string} spkrName     - Full character name, e.g. "Mrs Rogers"
-     * @param {string} spkrInitials - Two-letter icon label, e.g. "RS"
-     * @param {string} bgColor      - CSS colour name or hex string for the icon background
+     * @param {string} speakerName     - Full character name, e.g. "Mrs Rogers"
+     * @param {string} speakerInitials - Two-letter icon label, e.g. "RS"
+     * @param {string} bgColor         - CSS colour name or hex string for the icon background
      * @returns {Speaker}
      */
-    static create(spkrName, spkrInitials, bgColor) {
+    static create(speakerName, speakerInitials, bgColor) {
         Speaker.#isInternal = true;
-        const instance = new Speaker(spkrName, spkrInitials, bgColor);
-        Speaker.#isInternal = false;  // BUG FIX: was previously left as `true`
+        const instance = new Speaker(speakerName, speakerInitials, bgColor);
+        Speaker.#isInternal = false;
         Object.seal(instance);
         return instance;
     }
@@ -252,40 +245,40 @@ export class Speaker {
  * Creates the draggable `<div>` element representing a speaker on screen.
  * The div contains an SVG circle icon and is positioned within the speaker panel.
  *
- * divParms is mutated to track the current layout position:
+ * divParams is mutated to track the current layout position:
  *   { currentX, currentY, yIncrement, bottomOfColumnY, topOfColumnY }
  *
- * @param {DataStore} dataStore - Provides speakerAreaHeight for column-wrapping
- * @param {Speaker}   aSpeaker
- * @param {object}    divParms  - Mutable layout state (modified in-place)
- * @param {boolean}   isShadow  - If true, creates a ghost/shadow origin marker
+ * @param {DataStore} dataStore  - Provides speakerAreaHeight for column-wrapping
+ * @param {Speaker}   speaker
+ * @param {object}    divParams  - Mutable layout state (modified in-place)
+ * @param {boolean}   isShadow   - If true, creates a ghost/shadow origin marker
  * @returns {HTMLDivElement}
  */
-export function createSpeakerDiv(dataStore, aSpeaker, divParms, isShadow) {
+export function createSpeakerDiv(dataStore, speaker, divParams, isShadow) {
     const speakerDiv = document.createElement("div");
     speakerDiv.setAttribute("class", "speaker draggable");
 
     // Shadow and main icons share the same class but have different id prefixes
     const prefix = isShadow ? "shadow-div-" : "speaker-div-";
-    speakerDiv.id = prefix + aSpeaker.speakerInitials;
+    speakerDiv.id = prefix + speaker.speakerInitials;
 
-    speakerDiv.appendChild(createSvgElement(aSpeaker, isShadow));
+    speakerDiv.appendChild(createSvgElement(speaker, isShadow));
 
     // Column-wrap: if we've exceeded the speaker panel height, start a new column
-    if (divParms.currentY > dataStore.speakerAreaHeight) {
-        divParms.currentY        = 0;
-        divParms.bottomOfColumnY = 0;
-        divParms.currentX       += 30;
+    if (divParams.currentY > dataStore.speakerAreaHeight) {
+        divParams.currentY        = 0;
+        divParams.bottomOfColumnY = 0;
+        divParams.currentX       += 30;
     } else {
-        divParms.bottomOfColumnY = Math.max(divParms.bottomOfColumnY, divParms.currentY);
+        divParams.bottomOfColumnY = Math.max(divParams.bottomOfColumnY, divParams.currentY);
     }
 
     // Position via CSS transform (Interact.js uses data-x / data-y for tracking)
-    speakerDiv.style.transform = `translate(${divParms.currentX}px, ${divParms.currentY}px)`;
-    speakerDiv.setAttribute("data-x", divParms.currentX);
-    speakerDiv.setAttribute("data-y", divParms.currentY);
+    speakerDiv.style.transform = `translate(${divParams.currentX}px, ${divParams.currentY}px)`;
+    speakerDiv.setAttribute("data-x", divParams.currentX);
+    speakerDiv.setAttribute("data-y", divParams.currentY);
 
-    divParms.topOfColumnY = divParms.topOfColumnY || divParms.currentY;
+    divParams.topOfColumnY = divParams.topOfColumnY || divParams.currentY;
 
     return speakerDiv;
 }
@@ -296,11 +289,11 @@ export function createSpeakerDiv(dataStore, aSpeaker, divParms, isShadow) {
  * Uses a 100×100 viewBox (percentage-based coordinates) scaled to 30×30 px.
  * overflow="visible" lets connector lines extend outside the SVG bounds.
  *
- * @param {Speaker} aSpeaker
+ * @param {Speaker} speaker
  * @param {boolean} isShadow - If true, renders a pale ghost version
  * @returns {SVGSVGElement}
  */
-export function createSvgElement(aSpeaker, isShadow) {
+export function createSvgElement(speaker, isShadow) {
     const svgNS = "http://www.w3.org/2000/svg";
     const svg   = document.createElementNS(svgNS, "svg");
 
@@ -310,38 +303,36 @@ export function createSvgElement(aSpeaker, isShadow) {
     svg.setAttribute("viewBox",  "0 0 100 100");
     svg.setAttribute("overflow", "visible");
 
-    svg.appendChild(createCircleElement(aSpeaker, isShadow));
-    svg.appendChild(createTextElement(aSpeaker, isShadow));
+    svg.appendChild(createCircleElement(speaker, isShadow));
+    svg.appendChild(createTextElement(speaker, isShadow));
 
     return svg;
 }
 
-
-
 /**
  * Creates the `<text>` SVG element showing the speaker's initials inside the circle.
  *
- * @param {Speaker} aSpeaker
+ * @param {Speaker} speaker
  * @param {boolean} isShadow
  * @returns {SVGTextElement}
  */
-export function createTextElement(aSpeaker, isShadow) {
+export function createTextElement(speaker, isShadow) {
     const svgNS = "http://www.w3.org/2000/svg";
     const text  = document.createElementNS(svgNS, "text");
 
-    text.setAttribute("x",                aSpeaker.cx + "%");
-    text.setAttribute("y",                aSpeaker.cy + "%");
+    text.setAttribute("x",                speaker.cx + "%");
+    text.setAttribute("y",                speaker.cy + "%");
     text.setAttribute("text-anchor",       "middle");
     text.setAttribute("dominant-baseline", "central");
     text.setAttribute("font-size",         "30");
 
     // Choose text colour based on the effective (possibly lightened) background
     const effectiveBg = isShadow
-        ? getPalerColorHex(aSpeaker.backgroundColor)
-        : aSpeaker.backgroundColor;
+        ? getPalerColorHex(speaker.backgroundColor)
+        : speaker.backgroundColor;
     text.setAttribute("fill", textColorForBackground(effectiveBg));
 
-    text.textContent = aSpeaker.speakerInitials;
+    text.textContent = speaker.speakerInitials;
 
     return text;
 }
@@ -476,7 +467,7 @@ export function createMovementMarkerDiv(x, y, color, index = 0) {
     div.style.transform = `translate(${x}px, ${y}px)`;
     div.setAttribute("data-x", x);
     div.setAttribute("data-y", y);
-    div.style.zIndex    = "200";
+    div.style.zIndex        = "200";
     div.style.pointerEvents = "none";
 
     // SVG containing a small filled square
@@ -487,12 +478,12 @@ export function createMovementMarkerDiv(x, y, color, index = 0) {
     svg.setAttribute("overflow", "visible");
 
     const rect = document.createElementNS(svgNS, "rect");
-    rect.setAttribute("x",      "1");
-    rect.setAttribute("y",      "1");
-    rect.setAttribute("width",  "8");
-    rect.setAttribute("height", "8");
-    rect.setAttribute("fill",   color);
-    rect.setAttribute("stroke", "black");
+    rect.setAttribute("x",            "1");
+    rect.setAttribute("y",            "1");
+    rect.setAttribute("width",        "8");
+    rect.setAttribute("height",       "8");
+    rect.setAttribute("fill",         color);
+    rect.setAttribute("stroke",       "black");
     rect.setAttribute("stroke-width", "0.5");
 
     svg.appendChild(rect);
@@ -517,75 +508,6 @@ export function speakerObjFromSpeakerDiv(speakerDiv) {
 }
 
 // ---------------------------------------------------------------------------
-// Script navigation helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Returns the total page count of the loaded script.
- * Pages are delimited by elements with class "PageBreak" whose text contains "Page N".
- *
- * @param {HTMLIFrameElement} myIframe
- * @returns {number}
- */
-
-/**
- * Scrolls the iframe to bring the given page number into view.
- *
- * @param {HTMLIFrameElement} myIframe
- * @param {number}            pageNumber
- */
-
-/**
- * Returns the page number of the page that contains a given Movement's DOM node.
- * Walks backwards through siblings until a PageBreak element is found.
- *
- * @param {Movement} movement
- * @returns {number|null}
- */
-
-/**
- * Returns the page number at the element the user clicked.
- * Walks backwards through siblings from the click target until a PageBreak is found.
- *
- * @param {HTMLIFrameElement} iFrame
- * @param {MouseEvent}        e
- * @returns {number|null}
- */
-
-/**
- * Returns the page number currently visible at the top of the iframe viewport.
- * Finds the first visible DOM element then walks backwards to the nearest PageBreak.
- *
- * @param {HTMLIFrameElement} myIframe
- * @returns {number|null}
- */
-
-/**
- * Returns the movement-marker `<span>` immediately to the left of the cursor
- * in the clicked paragraph, or null if none is found.
- *
- * @param {MouseEvent}        e
- * @param {HTMLIFrameElement} myIframe
- * @param {DataStore}         dataStore
- * @returns {HTMLSpanElement|null}
- */
-
-
-// ---------------------------------------------------------------------------
-// Clicked-character position
-// ---------------------------------------------------------------------------
-
-/**
- * Returns the total character offset from the start of the clicked paragraph
- * to the position the user right-clicked in the iframe.
- *
- * Accounts for preceding sibling text nodes and inline elements (e.g. movement spans).
- *
- * @param {HTMLIFrameElement} iFrame
- * @returns {number} Character offset, or 0 on failure
- */
-
-// ---------------------------------------------------------------------------
 // HTML offset mapping (module-private)
 // ---------------------------------------------------------------------------
 
@@ -600,17 +522,17 @@ export function speakerObjFromSpeakerDiv(speakerDiv) {
  * @param {number}      offset  - Text-character offset from the Selection API
  * @returns {number}            - Corresponding index into element.innerHTML
  */
-function GetHtmlOffsetFromTextOffset(element, offset) {
-    const html    = element.innerHTML;
-    let   inTag   = false;
-    let   idx     = 0;
-    let   remaining = offset;
+function getHtmlOffsetFromTextOffset(element, offset) {
+    const html = element.innerHTML;
+    let inTag    = false;
+    let idx      = 0;
+    let remaining = offset;
 
     while (remaining > -1 && idx < html.length) {
         const ch = html[idx];
-        if (ch === "<")            inTag = true;
-        if (!inTag)                remaining -= 1;
-        if (inTag && ch === ">")   inTag = false;
+        if (ch === "<")           inTag = true;
+        if (!inTag)               remaining -= 1;
+        if (inTag && ch === ">")  inTag = false;
         idx += 1;
     }
     return idx;
@@ -634,18 +556,18 @@ function GetHtmlOffsetFromTextOffset(element, offset) {
  *      → Caller removes the span and sets dataStore.newMovement = null
  */
 export class Movement {
-    #_iFrame        = null;
-    #_dataStore     = null;
-    #_speakerDiv    = null;
-    #_imageAreaDiv  = null;
-    #_shadowDiv     = null;
-    #_element       = null;   // The paragraph that was right-clicked
-    #_offset        = null;   // Text character offset within that paragraph
-    #_id            = null;   // Unique id, e.g. "m-3"
-    #_pending       = true;   // True until the drop is completed
-    #_span          = null;   // The <span> injected into the script DOM
-    #speaker        = null;   // The Speaker (set when drag starts)
-    #_shadowRP      = null;   // Proportional position of the shadow (movement start point)
+    #iFrame        = null;
+    #dataStore     = null;
+    #speakerDiv    = null;
+    #imageAreaDiv  = null;
+    #shadowDiv     = null;
+    #element       = null;   // The paragraph that was right-clicked
+    #offset        = null;   // Text character offset within that paragraph
+    #id            = null;   // Unique id, e.g. "m-3"
+    #pending       = true;   // True until the drop is completed
+    #span          = null;   // The <span> injected into the script DOM
+    #speaker       = null;   // The Speaker (set when drag starts)
+    #shadowRP      = null;   // Proportional position of the shadow (movement start point)
 
     /**
      * Ordered list of movement-marker divs placed along the path via the spacebar.
@@ -662,41 +584,41 @@ export class Movement {
      * @param {number}            offset            - Text character offset of the click
      */
     constructor(iFrame, imageAreaDiv, dataStore, containingElement, offset) {
-        this.#_iFrame       = iFrame;
-        this.#_dataStore    = dataStore;
-        this.#_imageAreaDiv = imageAreaDiv;
-        this.#_element      = containingElement;
-        this.#_offset       = offset;
+        this.#iFrame       = iFrame;
+        this.#dataStore    = dataStore;
+        this.#imageAreaDiv = imageAreaDiv;
+        this.#element      = containingElement;
+        this.#offset       = offset;
 
         // Register with the movement list and assign an id
         const mList     = dataStore.movementList;
         const nextIndex = mList.count();
         mList.add(nextIndex, this);
-        this.#_id = "m-" + mList.count();
+        this.#id = "m-" + mList.count();
 
         // Insert a placeholder span into the script at the cursor position
-        this.#_span             = this.iFrameDoc.createElement("span");
-        this.#_span.textContent = "[?]";
-        this.#_span.className   = "m-new";
-        this.#_span.id          = this.#_id;
+        this.#span             = this.iFrameDoc.createElement("span");
+        this.#span.textContent = "[?]";
+        this.#span.className   = "m-new";
+        this.#span.id          = this.#id;
 
-        const htmlOffset = GetHtmlOffsetFromTextOffset(containingElement, offset);
+        const htmlOffset = getHtmlOffsetFromTextOffset(containingElement, offset);
         const html       = containingElement.innerHTML;
         containingElement.innerHTML =
             html.substring(0, htmlOffset) +
-            this.#_span.outerHTML +
+            this.#span.outerHTML +
             html.substring(htmlOffset);
     }
 
     // ── Getters ───────────────────────────────────────────────────────────
 
-    get imageAreaDiv() { return this.#_imageAreaDiv; }
+    get imageAreaDiv() { return this.#imageAreaDiv; }
 
     /** Shortcut to the iframe's contentDocument. */
-    get iFrameDoc()    { return this.#_iFrame.contentDocument; }
+    get iFrameDoc()    { return this.#iFrame.contentDocument; }
 
     /** Re-queries the span each time in case the DOM has been re-serialised. */
-    get node()         { return this.iFrameDoc.getElementById(this.#_id); }
+    get node()         { return this.iFrameDoc.getElementById(this.#id); }
 
     // ── speaker ───────────────────────────────────────────────────────────
 
@@ -710,7 +632,7 @@ export class Movement {
      */
     set speaker(value) {
         this.#speaker = value;
-        const span = this.iFrameDoc.getElementById(this.#_id);
+        const span = this.iFrameDoc.getElementById(this.#id);
         if (span) {
             span.className = "m-normal";
             span.innerHTML = `[${value.speakerInitials}]`;
@@ -719,15 +641,15 @@ export class Movement {
 
     // ── speakerDiv / shadowDiv ────────────────────────────────────────────
 
-    get speakerDiv()  { return this.#_speakerDiv; }
-    set speakerDiv(v) { this.#_speakerDiv = v; }
+    get speakerDiv()  { return this.#speakerDiv; }
+    set speakerDiv(v) { this.#speakerDiv = v; }
 
-    get shadowDiv()   { return this.#_shadowDiv; }
-    set shadowDiv(v)  { this.#_shadowDiv = v; }
+    get shadowDiv()   { return this.#shadowDiv; }
+    set shadowDiv(v)  { this.#shadowDiv = v; }
 
     /** Proportional position of the shadow icon (the movement's start point on stage). */
-    get shadowRP()    { return this.#_shadowRP; }
-    set shadowRP(v)   { this.#_shadowRP = v; }
+    get shadowRP()    { return this.#shadowRP; }
+    set shadowRP(v)   { this.#shadowRP = v; }
 
     // ── Methods ───────────────────────────────────────────────────────────
 
@@ -807,7 +729,7 @@ export class Movement {
 /**
  * Ordered collection of Movement objects for the current session.
  *
- * Backed by a Map (key = sequential integer) and a parallel _items array
+ * Backed by a Map (key = sequential integer) and a parallel #items array
  * for index-based access used by the debug log.
  */
 export class MovementList {
@@ -818,7 +740,7 @@ export class MovementList {
     #pageSeqs  = [{ page: 0, seq: 0 }]; // Last sequence number used per page
 
     /** Flat array mirroring the Map — provides index-based access. */
-    _items = [];
+    #items = [];
 
     /**
      * @param {HTMLIFrameElement} myIframe
@@ -826,7 +748,7 @@ export class MovementList {
      * @param {DataStore}         dataStore
      */
     constructor(myIframe, startPage, dataStore) {
-        this._startPage = startPage;
+        this.startPage  = startPage;
         this.#myIframe  = myIframe;
         this.#dataStore = dataStore;
     }
@@ -838,7 +760,7 @@ export class MovementList {
      */
     add(key, value) {
         this.#movements.set(key, value);
-        this._items.push(value);
+        this.#items.push(value);
     }
 
     /**
@@ -851,13 +773,16 @@ export class MovementList {
             throw new Error(`MovementList: no entry for key ${key}`);
         }
         this.#movements.set(key, newValue);
-        // Keep _items in sync
-        const idx = this._items.findIndex((m) => m === this.get(key));
-        if (idx !== -1) this._items[idx] = newValue;
+        // Keep #items in sync
+        const idx = this.#items.findIndex((m) => m === this.get(key));
+        if (idx !== -1) this.#items[idx] = newValue;
     }
 
     get(key)    { return this.#movements.get(key); }
     count()     { return this.#movements.size; }
+
+    /** Read-only access to the items array (used by getMovementListLog). */
+    get items() { return this.#items; }
 
     delete(key) {
         if (!this.#movements.has(key)) {
@@ -891,8 +816,8 @@ export class MovementList {
  * @param {DataStore} dataStore
  * @returns {string}
  */
-export function GetMovementListLog(from, dataStore) {
-    const items = dataStore.movementList._items;
+export function getMovementListLog(from, dataStore) {
+    const items = dataStore.movementList.items;
     let log = `[${from}]\n`;
     for (let i = 0; i < items.length; i++) {
         const m    = items[i];

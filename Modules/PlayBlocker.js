@@ -17,19 +17,19 @@
 
 import {
     DataStore, Speaker, speakers, Movement,
-    createTextElement, 
+    createTextElement,
     createSvgElement, createSpeakerDiv,
     createMovementMarkerDiv,
-    MovementList, GetMovementListLog,
+    MovementList, getMovementListLog,
     createRP,
     speakerObjFromSpeakerDiv,
 } from "../Modules/Backend.js";
 
 import {
-    GetCurrentPageNumber, getPreviousMovementMarker,
-    GetPageNumberAtCursor, GetPageNumberAtMovement,
-    GetClickedCharacterPosition, TotalPageCount,
-    GoToPage
+    getCurrentPageNumber, getPreviousMovementMarker,
+    getPageNumberAtCursor, getPageNumberAtMovement,
+    getClickedCharacterPosition, getTotalPageCount,
+    goToPage
 } from "../Modules/ScriptText.js";
 
 import {
@@ -38,7 +38,8 @@ import {
 
 import {
     saveScript
-} from  "../Modules/Database.js";
+} from "../Modules/Database.js";
+
 // ---------------------------------------------------------------------------
 // Module-level state
 // ---------------------------------------------------------------------------
@@ -185,7 +186,7 @@ if (document.getElementById("loginForm")) {
  * PlayBlocker page.  Called by the DOMContentLoaded handler below when the
  * page body id is "playBlockerPage".
  */
-function PlayBlockerPageSetup() {
+function playBlockerPageSetup() {
     // Show the chosen file name in the UI when a file is selected
     document.getElementById("fileInput").addEventListener("change", function () {
         const fileName = this.files[0] ? this.files[0].name : "No file selected";
@@ -260,12 +261,12 @@ function PlayBlockerPageSetup() {
     myIframe.contentWindow.addEventListener("scroll", iFrameOnScroll);
 
     // Register click handler for the script iframe (used for logging click positions)
-    iFrameListeners();
+    attachIFrameListeners();
 
     // Get-page-number button (diagnostic, currently unused in production UI)
     document.getElementById("get-page-number").addEventListener("click", () => {
-        const currentPage = GetCurrentPageNumber(myIframe);
-        const totalPages  = TotalPageCount(myIframe);
+        const currentPage = getCurrentPageNumber(myIframe);
+        const totalPages  = getTotalPageCount(myIframe);
         console.log(`Current page: ${currentPage} / ${totalPages}`);
     });
 
@@ -282,45 +283,45 @@ function PlayBlockerPageSetup() {
  *
  * TODO: Replace the hard-coded cast list with a user-supplied input form.
  *
- * @param {HTMLElement} spkrContainer - The speaker panel div
+ * @param {HTMLElement} speakerContainer - The speaker panel div
  */
-function insertSpeakers(spkrContainer) {
+function insertSpeakers(speakerContainer) {
     // Hard-coded cast for "And Then There Were None" — to be replaced with dynamic input
     const cast = [
-        ["Lombard",   "LO", "green"],
-        ["Marston",   "MA", "blue"],
-        ["Claythorne","CL", "pink"],
-        ["Wargrave",  "WA", "orange"],
-        ["Blore",     "BL", "purple"],
-        ["McKenzie",  "MK", "cyan"],
-        ["Armstrong", "AR", "yellow"],
-        ["Rogers",    "RO", "brown"],
-        ["Mrs Rogers","RS", "lightgray"],
-        ["Narracot",  "NA", "black"],
-        ["Brent",     "BR", "violet"]
+        ["Lombard",    "LO", "green"],
+        ["Marston",    "MA", "blue"],
+        ["Claythorne", "CL", "pink"],
+        ["Wargrave",   "WA", "orange"],
+        ["Blore",      "BL", "purple"],
+        ["McKenzie",   "MK", "cyan"],
+        ["Armstrong",  "AR", "yellow"],
+        ["Rogers",     "RO", "brown"],
+        ["Mrs Rogers", "RS", "lightgray"],
+        ["Narracot",   "NA", "black"],
+        ["Brent",      "BR", "violet"]
     ];
 
     cast.forEach(([name, initials, color]) => speakers.push(Speaker.create(name, initials, color)));
 
     // Layout parameters for the main icon column
-    const divParms = { currentX: 0,  currentY: 0, yIncrement: 30, bottomOfColumnY: 0, topOfColumnY: 0 };
+    const divParams    = { currentX: 0,  currentY: 0, yIncrement: 30, bottomOfColumnY: 0, topOfColumnY: 0 };
     // Layout parameters for the shadow (origin-marker) column — offset 70 px to the right
-    const shadowParms = { currentX: 70, currentY: 0, yIncrement: 30, bottomOfColumnY: 0, topOfColumnY: 0 };
+    const shadowParams = { currentX: 70, currentY: 0, yIncrement: 30, bottomOfColumnY: 0, topOfColumnY: 0 };
 
-    const speakerContainer = document.getElementById("image-area");
+    const container = document.getElementById("image-area");
 
     speakers.forEach((speaker) => {
         // Create the draggable icon
-        const speakerDiv = createSpeakerDiv(dataStore, speaker, divParms, false);
+        const speakerDiv = createSpeakerDiv(dataStore, speaker, divParams, false);
         speaker.speakerDiv = speakerDiv;
 
         // Create the ghost/shadow icon (shown as the origin during a drag)
-        const shadowDiv = createSpeakerDiv(dataStore, speaker, shadowParms, true);
+        const shadowDiv = createSpeakerDiv(dataStore, speaker, shadowParams, true);
         speaker.shadowDiv = shadowDiv;
 
-        divParms.currentY += divParms.yIncrement;
+        divParams.currentY += divParams.yIncrement;
 
-        speakerContainer.appendChild(speakerDiv);
+        container.appendChild(speakerDiv);
 
         // Record the icon's starting position so it can be reset after a cancelled drag
         speaker.originalX = speakerDiv.getAttribute("data-x");
@@ -339,7 +340,7 @@ function insertSpeakers(spkrContainer) {
 export function showLog() {
     const logContainer = document.getElementById("log-container");
     const logContent   = document.getElementById("log-content");
-    logContent.textContent = GetMovementListLog("showLog", dataStore);
+    logContent.textContent = getMovementListLog("showLog", dataStore);
     logContainer.style.display = "block";
 }
 
@@ -405,7 +406,6 @@ function onResize() {
  * @param {number} imgHeightOld - Image height before resize
  * @param {number} imgHeightNew - Image height after resize
  */
-
 function repositionSpeakers(
     imgLeftOld, imgLeftNew, imgTopOld, imgTopNew,
     imgWidthOld, imgWidthNew, imgHeightOld, imgHeightNew
@@ -429,7 +429,7 @@ function repositionSpeakers(
         const newPixelX = speakerObj.RP.rX * imgWidthNew + deltaLeft;
         const newPixelY = speakerObj.RP.rY * imgHeightNew + deltaTop;
 
-        // Reposition the speakerDiv (existing logic)
+        // Reposition the speakerDiv
         const oldFactors = parseTransform(speakerDiv.style.transform);
         const newX = parseFloat(oldFactors.x) + (newPixelX - oldPixelX);
         const newY = parseFloat(oldFactors.y) + (newPixelY - oldPixelY);
@@ -472,7 +472,6 @@ function repositionSpeakers(
     });
 }
 
-
 // ---------------------------------------------------------------------------
 // CSS transform parser
 // ---------------------------------------------------------------------------
@@ -498,9 +497,8 @@ function parseTransform(transform) {
  * Repositions movement markers and redraws every connector chain after a resize.
  *
  * speakerDivs are already repositioned by repositionSpeakers() before this runs.
- * Movement markers were placed at a fixed point on the stage image, so they must
- * shift by exactly the same pixel delta as their speakerDiv. That delta is
- * derived from the speaker's RP and the change in the stage image geometry.
+ * Each marker stores its own proportional position (markerDiv._rp) set at creation
+ * time, so it can be repositioned independently of the speaker's drop position.
  *
  * @param {number} imgLeftOld
  * @param {number} imgLeftNew
@@ -521,12 +519,12 @@ function redrawMovementLines(
     dataStore.movementList.forEach((movement) => {
         if (!movement.speakerDiv || !movement.shadowDiv) return;
 
-        const rp = movement.speaker?.RP;
-        if (rp && movement.movementMarkers.length > 0) {
+        const speakerRp = movement.speaker?.RP;
+        if (speakerRp && movement.movementMarkers.length > 0) {
             movement.movementMarkers.forEach((markerDiv) => {
                 // Each marker has its own RP stored at creation time.
                 // Fall back to the speaker's RP only if somehow absent.
-                const markerRp = markerDiv._rp || rp;
+                const markerRp = markerDiv._rp || speakerRp;
                 const oldMarkerPixelX = markerRp.rX * imgWidthOld;
                 const oldMarkerPixelY = markerRp.rY * imgHeightOld;
                 const newMarkerPixelX = markerRp.rX * imgWidthNew + deltaLeft;
@@ -554,11 +552,11 @@ function redrawMovementLines(
  * Extracts the speaker initials from a speaker or shadow div's id.
  * Id format: "speaker-div-XX" or "shadow-div-XX".
  *
- * @param {HTMLElement} speakerDiv
+ * @param {HTMLElement} div
  * @returns {string}
  */
-function speakerInitialsFromDiv(speakerDiv) {
-    return speakerDiv.id.split("-").pop();
+function speakerInitialsFromDiv(div) {
+    return div.id.split("-").pop();
 }
 
 /**
@@ -586,8 +584,7 @@ function xyToProportional(rawPosition) {
  * @param {Event} event - The change event from the file input
  */
 function handleFileSelection(event) {
-    const file            = event.target.files[0];
-    const messageDisplay  = document.getElementById("message");
+    const file = event.target.files[0];
 
     if (!file) {
         showMessage("No file selected. Please choose a file.", "error");
@@ -605,24 +602,24 @@ function handleFileSelection(event) {
         myIframe.contentDocument.body.innerHTML = reader.result;
 
         // Re-attach click handlers (they are lost when the body is replaced)
-        iFrameListeners();
+        attachIFrameListeners();
 
         // Update state
         dataStore.script.fileName    = file.name;
         dataStore.script.htmlContent = myIframe.contentDocument.body.innerHTML;
 
-        const startingPage = GetCurrentPageNumber(myIframe);
-        pageCount          = TotalPageCount(myIframe);
+        const startingPage = getCurrentPageNumber(myIframe);
+        pageCount          = getTotalPageCount(myIframe);
 
         dataStore.movementList.pageCount = pageCount;
         dataStore.movementList.startPage = startingPage;
 
         // Sync slider to the first visible page
-        slider.value             = startingPage;
-        output.innerHTML         = slider.value;
+        slider.value     = startingPage;
+        output.innerHTML = slider.value;
 
         // Show the download button and slider now that a script is loaded
-        document.getElementById("saveScript").style.visibility = "visible";
+        document.getElementById("saveScript").style.visibility    = "visible";
         document.getElementById("slidecontainer").style.visibility = "visible";
 
         scriptLoaded = true;
@@ -647,7 +644,6 @@ function showMessage(message, type) {
     messageDisplay.style.color = type === "error" ? "red" : "green";
 }
 
-
 // ---------------------------------------------------------------------------
 // Script download
 // ---------------------------------------------------------------------------
@@ -665,9 +661,9 @@ function downloadTextFile() {
 
     // Use a hidden anchor to trigger the browser's save dialog
     const a = Object.assign(document.createElement("a"), {
-        href:    url,
+        href:     url,
         download: fileName,
-        style:   "display:none"
+        style:    "display:none"
     });
     document.body.appendChild(a);
     a.click();
@@ -687,7 +683,7 @@ function downloadTextFile() {
  */
 function sliderOnChange(e) {
     const page = Math.round(pageCount * (e.target.value / 100));
-    GoToPage(myIframe, page);
+    goToPage(myIframe, page);
     dataStore.currentPage = page;
 }
 
@@ -696,9 +692,9 @@ function sliderOnChange(e) {
  * Keeps the slider in sync with the currently visible page.
  */
 function iFrameOnScroll() {
-    const page = GetCurrentPageNumber(myIframe);
+    const page = getCurrentPageNumber(myIframe);
     if (page !== dataStore.currentPage) {
-        slider.value    = 100 * page / pageCount;
+        slider.value     = 100 * page / pageCount;
         output.innerHTML = slider.value;
         dataStore.currentPage = page;
     }
@@ -781,9 +777,9 @@ function insertMovementMarker() {
     // markerX/Y are offsets from #image-area top-left; we subtract the image's
     // own offset within that container to get coordinates relative to the image,
     // then divide by image dimensions to get fractions [0,1].
-    const imageAreaRect  = imageAreaDiv.getBoundingClientRect();
-    const imgOffsetLeft  = stageImageRect.left - imageAreaRect.left;
-    const imgOffsetTop   = stageImageRect.top  - imageAreaRect.top;
+    const imageAreaRect = imageAreaDiv.getBoundingClientRect();
+    const imgOffsetLeft = stageImageRect.left - imageAreaRect.left;
+    const imgOffsetTop  = stageImageRect.top  - imageAreaRect.top;
     // Use the marker's centre (markerX+5, markerY+5) relative to the image
     markerDiv._rp = createRP(
         markerX + 5 - imgOffsetLeft,
@@ -803,9 +799,9 @@ function insertMovementMarker() {
  * @param {"up"|"down"} direction
  */
 function scrollToAdjacentPage(direction) {
-    const iframeDoc   = myIframe.contentDocument || myIframe.contentWindow.document;
-    const pageBreaks  = Array.from(iframeDoc.querySelectorAll(".PageBreak"));
-    const currentPage = GetCurrentPageNumber(myIframe);
+    const iframeDoc  = myIframe.contentDocument || myIframe.contentWindow.document;
+    const pageBreaks = Array.from(iframeDoc.querySelectorAll(".PageBreak"));
+    const currentPage = getCurrentPageNumber(myIframe);
     const targetPage  = direction === "up" ? currentPage - 1 : currentPage + 1;
 
     const target = pageBreaks.find((el) => el.innerText.includes(`-Page ${targetPage}-`));
@@ -846,7 +842,7 @@ function startMovement(e) {
         return;
     }
 
-    const offset     = GetClickedCharacterPosition(myIframe);
+    const offset      = getClickedCharacterPosition(myIframe);
     const newMovement = new Movement(myIframe, imageAreaDiv, dataStore, e.target, offset);
     dataStore.newMovement = newMovement;
     window.focus();
@@ -860,8 +856,8 @@ function startMovement(e) {
  * Re-attaches the click listener to the iframe body.
  * Must be called after the iframe body is replaced (e.g. on file load).
  */
-function iFrameListeners() {
-    myIframe.contentDocument.addEventListener("click", scriptOnClick);
+function attachIFrameListeners() {
+    myIframe.contentDocument.addEventListener("click", onScriptClick);
 }
 
 /**
@@ -870,8 +866,8 @@ function iFrameListeners() {
  *
  * @param {MouseEvent} e
  */
-function scriptOnClick(e) {
-    const x = GetClickedCharacterPosition(myIframe);
+function onScriptClick(e) {
+    const x = getClickedCharacterPosition(myIframe);
     console.log("Clicked at character offset:", x);
 }
 
@@ -883,14 +879,14 @@ function scriptOnClick(e) {
  * Wraps the current text selection inside the iframe with a new element.
  * Useful for future annotation features.
  *
- * @param {string} iframeId  - The iframe element id
- * @param {string} tagName   - The tag to wrap with, e.g. "span"
+ * @param {string} iframeId    - The iframe element id
+ * @param {string} tagName     - The tag to wrap with, e.g. "span"
  * @param {string} [className] - Optional CSS class for the wrapper
  */
 function wrapIframeSelection(iframeId, tagName, className) {
-    const iframe    = document.getElementById(iframeId);
-    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-    const selection = iframe.contentWindow.getSelection();
+    const iframe     = document.getElementById(iframeId);
+    const iframeDoc  = iframe.contentDocument || iframe.contentWindow.document;
+    const selection  = iframe.contentWindow.getSelection();
 
     if (selection.rangeCount > 0) {
         const range   = selection.getRangeAt(0);
@@ -914,7 +910,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Route to the correct page initialiser based on the body id
     switch (document.body.id) {
         case "playBlockerPage":
-            PlayBlockerPageSetup();
+            playBlockerPageSetup();
             break;
         case "indexPage":
             console.log("Index page loaded.");
@@ -1003,7 +999,7 @@ interact(".draggable").draggable({
          * Drag-move: update the icon's position and redraw the connector line.
          */
         move(event) {
-            const target   = event.target;
+            const target = event.target;
             const x = (parseFloat(target.getAttribute("data-x")) || 0) + event.dx;
             const y = (parseFloat(target.getAttribute("data-y")) || 0) + event.dy;
 
@@ -1069,11 +1065,11 @@ interact(".stage-image").dropzone({
     },
 
     ondrop(event) {
-        wasDroppedInImageArea  = true;
+        wasDroppedInImageArea       = true;
         event.relatedTarget.onImage = true;
 
         // Compute proportional position on the stage image
-        const rP = createRP(
+        const rp = createRP(
             event.dragEvent.clientX,
             event.dragEvent.clientY,
             stageImageElement,
@@ -1082,10 +1078,10 @@ interact(".stage-image").dropzone({
 
         const speakerDiv = event.relatedTarget;
         const speakerObj = speakerObjFromSpeakerDiv(speakerDiv);
-        speakerObj.RP    = rP;
+        speakerObj.RP    = rp;
 
-        document.body.style.cursor            = "default";
-        myIframe.contentDocument.body.style.cursor = "text";
+        document.body.style.cursor                    = "default";
+        myIframe.contentDocument.body.style.cursor    = "text";
 
         // The movement is complete
         if (dataStore.incompleteMovement) {
@@ -1093,7 +1089,7 @@ interact(".stage-image").dropzone({
         }
         if (dataStore.newMovement) {
             dataStore.newMovement = null;
-            console.log(GetMovementListLog("ondrop", dataStore));
+            console.log(getMovementListLog("ondrop", dataStore));
         }
     }
 

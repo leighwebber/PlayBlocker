@@ -1,4 +1,4 @@
-export function GetCurrentPageNumber(myIframe) {
+export function getCurrentPageNumber(myIframe) {
     const innerDoc       = myIframe.contentDocument || myIframe.contentWindow.document;
     const viewportHeight = myIframe.contentWindow.innerHeight;
 
@@ -18,6 +18,7 @@ export function GetCurrentPageNumber(myIframe) {
     }
     return el ? parseInt(el.innerText.split("Page").pop(), 10) : null;
 }
+
 export function getPreviousMovementMarker(e, myIframe, dataStore) {
     const para  = e.target;
     const spans = para.querySelectorAll("span");
@@ -35,10 +36,11 @@ export function getPreviousMovementMarker(e, myIframe, dataStore) {
     }
     return null;
 }
-export function GetPageNumberAtCursor(iFrame, e) {
+
+export function getPageNumberAtCursor(iFrame, e) {
     const clicked = e.target;
     if (clicked.tagName.toUpperCase() === "BODY") {
-        console.warn("GetPageNumberAtCursor: click landed on <body>.");
+        console.warn("getPageNumberAtCursor: click landed on <body>.");
         return null;
     }
 
@@ -49,7 +51,8 @@ export function GetPageNumberAtCursor(iFrame, e) {
     }
     return el ? parseInt(el.innerText.split("Page").pop(), 10) : 0;
 }
-export function GetPageNumberAtMovement(movement) {
+
+export function getPageNumberAtMovement(movement) {
     let el = movement.node.parentElement;
     while (el && el.className !== "PageBreak") {
         el = el.previousElementSibling;
@@ -57,7 +60,8 @@ export function GetPageNumberAtMovement(movement) {
     }
     return el ? parseInt(el.innerText.split("Page").pop(), 10) : null;
 }
-export function GetClickedCharacterPosition(iFrame) {
+
+export function getClickedCharacterPosition(iFrame) {
     const doc   = iFrame.contentDocument;
     const range = doc.caretRangeFromPoint(event.clientX, event.clientY);
     if (!range) return 0;
@@ -75,22 +79,24 @@ export function GetClickedCharacterPosition(iFrame) {
         return total;
     }
 
-    console.error("GetClickedCharacterPosition: click was not inside a text node.");
+    console.error("getClickedCharacterPosition: click was not inside a text node.");
     return 0;
 }
-export function TotalPageCount(myIframe) {
+
+export function getTotalPageCount(myIframe) {
     const innerDoc   = myIframe.contentDocument || myIframe.contentWindow.document;
     const pageBreaks = innerDoc.querySelectorAll(".PageBreak");
     if (!pageBreaks.length) return 0;
     return parseInt(pageBreaks[pageBreaks.length - 1].innerText.split("Page").pop(), 10);
 }
-export function GoToPage(myIframe, pageNumber) {
+
+export function goToPage(myIframe, pageNumber) {
     const innerDoc   = myIframe.contentDocument || myIframe.contentWindow.document;
     const pageBreaks = Array.from(innerDoc.querySelectorAll(".PageBreak"));
     const target     = pageBreaks.find((el) => el.innerText.includes(String(pageNumber)));
     if (target) {
         target.scrollIntoView({ behavior: "auto", block: "start" });
     } else {
-        console.warn(`GoToPage: no PageBreak found for page ${pageNumber}`);
+        console.warn(`goToPage: no PageBreak found for page ${pageNumber}`);
     }
 }
