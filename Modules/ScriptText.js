@@ -67,36 +67,35 @@ export function getClickedCharacterPosition(iFrame) {
     if (!range) return 0;
 
     const textNode = range.startContainer;
-    const offset   = range.startOffset;
+    let   offset   = range.startOffset;
 
     if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-        // Sum offsets of preceding siblings to get absolute position in the paragraph
+        const text = textNode.data;
+
+        // Snap to word boundary within this text node, using only the local offset.
+        // We want the insertion point at the START of the clicked word, or — if the
+        // click landed on whitespace — at the start of the next word to the right.
+        if (/\S/.test(text[offset] ?? "")) {
+            // Inside a word — walk left to its start
+            while (offset > 0 && /\S/.test(text[offset - 1])) {
+                offset -= 1;
+            }
+        } else {
+            // On whitespace — walk right to the next word
+            while (offset < text.length && /\s/.test(text[offset])) {
+                offset += 1;
+            }
+            // If we walked off the end of this text node, clamp to its length;
+            // the insertion will land at the boundary between this node and the next.
+            offset = Math.min(offset, text.length);
+        }
+
+        // Now accumulate preceding siblings to get the absolute offset in the paragraph
         let total = offset;
         let node  = textNode;
         while (node.previousSibling) {
             node   = node.previousSibling;
             total += node.textContent.length;
-        }
-
-        // Snap to word boundary: insert at the START of the clicked word, or —
-        // if the click landed on whitespace — at the start of the next word to the right.
-        //
-        //   Mid-word  → walk left until whitespace or string start  (word start)
-        //   Whitespace → walk right until non-whitespace             (next word start)
-        const paraText = textNode.parentElement.closest(".Speech, .StageDirection")?.textContent ?? "";
-
-        if (paraText.length > 0) {
-            if (/\S/.test(paraText[total] ?? "")) {
-                // Inside a word — back up to its start
-                while (total > 0 && /\S/.test(paraText[total - 1])) {
-                    total -= 1;
-                }
-            } else {
-                // On whitespace — advance to the next word
-                while (total < paraText.length && /\s/.test(paraText[total])) {
-                    total += 1;
-                }
-            }
         }
 
         return total;
