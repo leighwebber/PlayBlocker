@@ -70,12 +70,35 @@ export function getClickedCharacterPosition(iFrame) {
     const offset   = range.startOffset;
 
     if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+        // Sum offsets of preceding siblings to get absolute position in the paragraph
         let total = offset;
         let node  = textNode;
         while (node.previousSibling) {
             node   = node.previousSibling;
             total += node.textContent.length;
         }
+
+        // Snap to word boundary: insert at the START of the clicked word, or —
+        // if the click landed on whitespace — at the start of the next word to the right.
+        //
+        //   Mid-word  → walk left until whitespace or string start  (word start)
+        //   Whitespace → walk right until non-whitespace             (next word start)
+        const paraText = textNode.parentElement.closest(".Speech, .StageDirection")?.textContent ?? "";
+
+        if (paraText.length > 0) {
+            if (/\S/.test(paraText[total] ?? "")) {
+                // Inside a word — back up to its start
+                while (total > 0 && /\S/.test(paraText[total - 1])) {
+                    total -= 1;
+                }
+            } else {
+                // On whitespace — advance to the next word
+                while (total < paraText.length && /\s/.test(paraText[total])) {
+                    total += 1;
+                }
+            }
+        }
+
         return total;
     }
 
