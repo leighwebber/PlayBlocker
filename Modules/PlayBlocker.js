@@ -963,6 +963,20 @@ interact(".draggable").draggable({
                 const initials = event.target.id.split("-").pop();
                 const speaker  = speakers.find((s) => s.speakerInitials === initials);
 
+                // A speaker must be on the stage before a movement can be recorded for them.
+                // "On stage" means they have been dropped onto the stage image at least once
+                // (speaker.RP is set by the ondrop handler).
+                if (!speaker.RP) {
+                    // Cancel the pending movement — remove the [?] span and reset state
+                    const span   = dataStore.newMovement.node;
+                    const parent = span?.parentNode;
+                    span?.remove();
+                    parent?.normalize();
+                    dataStore.newMovement = null;
+                    alert(`${speaker.speakerName} is not yet on stage. Drag them onto the stage image first before recording a movement.`);
+                    return;
+                }
+
                 // Linking the speaker updates the placeholder span in the script text
                 dataStore.newMovement.speaker = speaker;
 
