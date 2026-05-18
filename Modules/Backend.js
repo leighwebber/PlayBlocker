@@ -156,6 +156,7 @@ export class Speaker {
 
     #originalX        = null;
     #originalY        = null;
+    #onImage          = false;
     #speakerDiv       = null;
     #shadowDiv        = null;
     #speakerFirstName      = "";
@@ -175,6 +176,9 @@ export class Speaker {
 
     get shadowDiv()        { return this.#shadowDiv; }
     set shadowDiv(v)       { this.#shadowDiv = v; }
+
+    get onImage()        { return this.#onImage; }
+    set onImage(v)       { this.#onImage = v; }
 
     get originalX()        { return this.#originalX; }
     set originalX(v)       { this.#originalX = v; }

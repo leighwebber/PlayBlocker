@@ -236,6 +236,11 @@ async function playBlockerPageSetup() {
     // Populate speaker icons in the speaker panel
     await insertSpeakers(speakerAreaElement);
 
+    // Place any server-restored speakers at their saved stage positions.
+    // Run immediately (image likely cached) and again on load as a fallback.
+    initialPositionSpeakers();
+    stageImageElement.addEventListener("load", initialPositionSpeakers, { once: true });
+
     // Keyboard navigation
     window.addEventListener("keydown", handleKeyDown);
 
@@ -369,20 +374,23 @@ async function insertSpeakers(speakerContainer) {
         shadowDiv.addEventListener("click", (e) => {
             if (dataStore.newMovement) {
                 e.stopPropagation();
-                // AudioContext beep (works without any audio files)
-                try {
-                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-                    osc.type = "square";
-                    osc.frequency.value = 440;
-                    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
-                    osc.start(ctx.currentTime);
-                    osc.stop(ctx.currentTime + 0.25);
-                } catch (_) { /* silently skip if AudioContext unavailable */ }
+                playBeep();
+            }
+        });
+
+        // --- Block off-stage speakers during pending movement ---
+        speakerDiv.addEventListener("mouseenter", () => {
+            if (dataStore.newMovement && !speaker.RP) {
+                speakerDiv.style.cursor = NO_ENTRY_CURSOR;
+            }
+        });
+        speakerDiv.addEventListener("mouseleave", () => {
+            speakerDiv.style.cursor = "";
+        });
+        speakerDiv.addEventListener("click", (e) => {
+            if (dataStore.newMovement && !speaker.RP) {
+                e.stopPropagation();
+                playBeep();
             }
         });
 
@@ -988,6 +996,64 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Helpers — stage geometry and audio feedback
+// ---------------------------------------------------------------------------
+
+/**
+ * Positions all speakers that have a server-restored RP at their saved stage
+ * location. Called once after insertSpeakers() and again on the image load
+ * event (in case the image wasn't ready at DOMContentLoaded time).
+ */
+function initialPositionSpeakers() {
+    const imgRect  = stageImageElement.getBoundingClientRect();
+    const areaRect = speakerAreaElement.getBoundingClientRect();
+
+    if (imgRect.width === 0) return; // Image not loaded yet — wait for load event
+
+    const imgOffsetLeft = imgRect.left - areaRect.left;
+    const imgOffsetTop  = imgRect.top  - areaRect.top;
+
+    speakers.forEach(speaker => {
+        if (!speaker.RP || !speaker.speakerDiv) return;
+
+        const pixelX = speaker.RP.rX * imgRect.width  + imgOffsetLeft;
+        const pixelY = speaker.RP.rY * imgRect.height + imgOffsetTop;
+
+        const div = speaker.speakerDiv;
+        div.style.transform = `translate(${pixelX}px, ${pixelY}px)`;
+        div.setAttribute("data-x", pixelX);
+        div.setAttribute("data-y", pixelY);
+
+        // Update the snap-back origin so an invalid drop returns to stage, not column
+        speaker.originalX = pixelX;
+        speaker.originalY = pixelY;
+    });
+
+    // Sync the "old" rect values so the first resize computes correct deltas
+    stageImageRect = imgRect;
+    imgLeftOld     = imgRect.left;
+    imgTopOld      = imgRect.top;
+    imgWidthOld    = imgRect.width;
+    imgHeightOld   = imgRect.height;
+}
+
+function playBeep() {
+    try {
+        const ctx  = new (window.AudioContext || window.webkitAudioContext)();
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = "square";
+        osc.frequency.value = 440;
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.25);
+    } catch (_) { /* silently skip if AudioContext unavailable */ }
+}
+
+// ---------------------------------------------------------------------------
 // Interact.js — drag-and-drop configuration
 // ---------------------------------------------------------------------------
 
@@ -1030,17 +1096,10 @@ interact(".draggable").draggable({
                 const initials = event.target.id.split("-").pop();
                 const speaker  = speakers.find((s) => s.speakerInitials === initials);
 
-                // A speaker must be on the stage before a movement can be recorded for them.
-                // "On stage" means they have been dropped onto the stage image at least once
-                // (speaker.RP is set by the ondrop handler).
+                // Only speakers that have been placed on the stage image can be selected.
                 if (!speaker.RP) {
-                    // Cancel the pending movement — remove the [?] span and reset state
-                    const span   = dataStore.newMovement.node;
-                    const parent = span?.parentNode;
-                    span?.remove();
-                    parent?.normalize();
-                    dataStore.newMovement = null;
-                    alert(`${speaker.FirstName} ${speaker.LastName} is not yet on stage. Drag them onto the stage image first before recording a movement.`);
+                    event.interaction.stop();
+                    playBeep();
                     return;
                 }
 

@@ -450,6 +450,8 @@ function repositionSpeakers(
         const speakerObj = speakerObjFromSpeakerDiv(speakerDiv);
 
         if (!speakerObj.RP) return;
+        // If the speaker has not yet been placed on the image, don't reposition it.
+        if (!speakerObj.onImage) return;
 
         const oldPixelX = speakerObj.RP.rX * imgWidthOld;
         const oldPixelY = speakerObj.RP.rY * imgHeightOld;
@@ -1139,6 +1141,8 @@ interact(".stage-image").dropzone({
                 console.error("saveMovement failed:", err);
             }
             dataStore.incompleteMovement = null;
+            // Set this speakerObj as onImage = true;
+            speakerObj.onImage = true;
         }
         if (dataStore.newMovement) {
             dataStore.newMovement = null;
