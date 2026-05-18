@@ -123,7 +123,6 @@ if (document.getElementById("registerForm")) {
     document.getElementById("registerForm").addEventListener("submit", async (e) => {
         e.preventDefault();
         const data = Object.fromEntries(new FormData(e.target));
-
         const response = await fetch(`${API_URL}/register`, {
             method:  "POST",
             headers: { "Content-Type": "application/json" },

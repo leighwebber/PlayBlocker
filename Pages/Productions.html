@@ -27,6 +27,17 @@
                     if (data) {
                     // Store non-sensitive info for the rest of the page to use
                     window.__session = data;
+                    const setUsername = () => {
+                        const el = document.getElementById("username");
+                        if (el) {
+                            el.textContent = [data.first_name, data.last_name].filter(Boolean).join(" ");
+                        }
+                    };
+                    if (document.readyState === "loading") {
+                        document.addEventListener("DOMContentLoaded", setUsername);
+                    } else {
+                        setUsername();
+                    }
                     }
                 } else {
                     // 401 / 403 → token missing, expired, or invalid
