@@ -315,7 +315,7 @@ async function insertSpeakers(speakerContainer) {
     }
 
     const castData = serverRows.length > 0
-        ? serverRows.map((r) => [r.first_name, r.last_name, r.initials, r.color, r.id, r.rpX, r.rpY])
+        ? serverRows.map((r) => [r.firstName, r.lastName, r.initials, r.color, r.id, r.rpX, r.rpY])
         : fallbackCast.map((r) => [...r, null, null, null]);  // id, rpX, rpY all null
 
     castData.forEach(([firstName, lastName, initials, color, dbId]) => {

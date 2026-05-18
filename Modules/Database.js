@@ -53,7 +53,8 @@ export async function fetchSpeakers() {
     // Normalise the server's snake_case column names to camelCase for the client
     return rows.map((row) => ({
         id:       row.id,
-        name:     row.name,
+        firstName: row.first_name,
+        lastName: row.last_name,
         initials: row.initials,
         color:    row.color,
         rpX:      row.rp_x != null ? parseFloat(row.rp_x) : null,
