@@ -995,7 +995,7 @@ interact(".draggable").draggable({
                 // A speaker must be on the stage before a movement can be recorded for them.
                 // "On stage" means they have been dropped onto the stage image at least once
                 // (speaker.RP is set by the ondrop handler).
-                if (!speaker.RP) {
+                if (!speaker.onImage) {
                     // Cancel the pending movement — remove the [?] span and reset state
                     const span   = dataStore.newMovement.node;
                     const parent = span?.parentNode;
@@ -1132,6 +1132,8 @@ interact(".stage-image").dropzone({
         } catch (err) {
             console.error("saveSpeakers failed:", err);
         }
+        // Set this speakerObj as onImage = true;
+        speakerObj.onImage = true;
 
         // If this drop completed a movement, persist it before clearing the reference
         if (dataStore.incompleteMovement) {
@@ -1141,8 +1143,6 @@ interact(".stage-image").dropzone({
                 console.error("saveMovement failed:", err);
             }
             dataStore.incompleteMovement = null;
-            // Set this speakerObj as onImage = true;
-            speakerObj.onImage = true;
         }
         if (dataStore.newMovement) {
             dataStore.newMovement = null;
