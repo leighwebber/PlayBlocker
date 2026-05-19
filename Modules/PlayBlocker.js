@@ -401,7 +401,16 @@ function restoreAtCursor() {
     // Clear any stale shadow divs and markers from a previous session
     speakerAreaElement.querySelectorAll('[id^="shadow-div-"], .movement-marker').forEach(el => el.remove());
 
-    if (targetPositions) restoreSpeakerPositions(targetPositions);
+    if (!targetPositions) return;
+
+    // On a fresh load no speaker has been dragged yet, so onImage is false and
+    // restoreSpeakerPositions would skip everyone.  Mark each speaker in the
+    // snapshot as onImage before calling it.
+    targetPositions.forEach(({ initials }) => {
+        const speaker = speakers.find(s => s.speakerInitials === initials);
+        if (speaker) speaker.onImage = true;
+    });
+    restoreSpeakerPositions(targetPositions);
 }
 
 // ---------------------------------------------------------------------------
