@@ -42,6 +42,7 @@ import {
     saveSpeakers,
     saveMovement,
     fetchMovements,
+    fetchProduction,
 } from "../Modules/Database.js";
 
 // ---------------------------------------------------------------------------
@@ -203,9 +204,7 @@ async function playBlockerPageSetup() {
     myIframe  = document.getElementById("script-iframe");
     dataStore = new DataStore(myIframe);
 
-    // During development, the productionID is hard coded. IRL, the
-    // user will select the current production from an options page
-    dataStore.productionId = 1;
+    dataStore.productionId = parseInt(new URLSearchParams(window.location.search).get("productionId"), 10) || 1;
 
     // Speaker panel height (needed for column-wrap in createSpeakerDiv)
     speakerAreaElement = document.getElementById("image-area");
@@ -280,7 +279,99 @@ async function playBlockerPageSetup() {
         console.log(`Current page: ${currentPage} / ${totalPages}`);
     });
 
+    // Auto-load stage image and script from the selected production
+    await loadProductionData();
+
     console.log("PlayBlocker page loaded.");
+}
+
+// ---------------------------------------------------------------------------
+// Production auto-load
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolves when the iframe's initial page has fully loaded.
+ * If it's already ready, resolves immediately.
+ */
+function waitForIframe() {
+    return new Promise(resolve => {
+        if (myIframe.contentDocument?.readyState === "complete") {
+            resolve();
+        } else {
+            myIframe.addEventListener("load", resolve, { once: true });
+        }
+    });
+}
+
+/**
+ * Positions all speakers that have a saved RP onto the stage image.
+ * Called once after the production's stage image has finished loading.
+ */
+function placeSavedSpeakersOnStage() {
+    const imgRect  = stageImageElement.getBoundingClientRect();
+    const areaRect = speakerAreaElement.getBoundingClientRect();
+
+    speakers.forEach(speaker => {
+        if (!speaker.RP) return;
+        speaker.onImage = true;
+        const x = speaker.RP.rX * imgRect.width  + (imgRect.left - areaRect.left) - 15;
+        const y = speaker.RP.rY * imgRect.height + (imgRect.top  - areaRect.top)  - 15;
+        speaker.speakerDiv.style.transform = `translate(${x}px, ${y}px)`;
+        speaker.speakerDiv.setAttribute("data-x", x);
+        speaker.speakerDiv.setAttribute("data-y", y);
+    });
+}
+
+/**
+ * Fetches the current production's stage image and script body from the API
+ * and loads them into the page, exactly as if the user had uploaded both files.
+ */
+async function loadProductionData() {
+    let production;
+    try {
+        production = await fetchProduction(dataStore.productionId);
+    } catch (err) {
+        console.warn("loadProductionData: could not fetch production —", err);
+        return;
+    }
+
+    // ---- Stage image ----
+    if (production.stage_image) {
+        await new Promise(resolve => {
+            stageImageElement.onload = () => {
+                // Recapture geometry with the new image's rendered dimensions
+                stageImageRect  = stageImageElement.getBoundingClientRect();
+                imgLeftOld  = stageImageRect.left;
+                imgTopOld   = stageImageRect.top;
+                imgWidthOld = stageImageRect.width;
+                imgHeightOld = stageImageRect.height;
+                resolve();
+            };
+            stageImageElement.src = production.stage_image;
+        });
+    }
+
+    // Place any speakers that have saved stage positions
+    placeSavedSpeakersOnStage();
+
+    // ---- Script ----
+    if (production.script_body) {
+        await waitForIframe();
+        myIframe.contentDocument.body.innerHTML = production.script_body;
+        attachIFrameListeners();
+        loadMovementPositions();
+
+        const startingPage = getCurrentPageNumber(myIframe);
+        pageCount          = getTotalPageCount(myIframe);
+        dataStore.movementList.pageCount = pageCount;
+        dataStore.movementList.startPage = startingPage;
+        slider.value     = startingPage;
+        output.innerHTML = slider.value;
+
+        document.getElementById("saveScript").style.visibility    = "visible";
+        document.getElementById("slidecontainer").style.visibility = "visible";
+        scriptLoaded = true;
+    }
 }
 
 // ---------------------------------------------------------------------------

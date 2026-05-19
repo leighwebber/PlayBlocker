@@ -148,6 +148,29 @@ export async function saveMovement(movement, speakerDbId, productionId) {
 }
 
 // ---------------------------------------------------------------------------
+// Productions — fetchProduction
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetches the full record for a single production, including stage_image and
+ * script_body, so PlayBlocker can auto-load them on startup.
+ *
+ * @param {number} productionId
+ * @returns {Promise<{id, name, stage_image, script_body}>}
+ */
+export async function fetchProduction(productionId) {
+    const response = await fetch(`${API_URL}/productions/${productionId}`, {
+        method:      "GET",
+        credentials: "include",
+        headers:     { "Accept": "application/json" },
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to fetch production: ${response.statusText}`);
+    }
+    return await response.json();
+}
+
+// ---------------------------------------------------------------------------
 // Movements — fetchMovements
 // ---------------------------------------------------------------------------
 
