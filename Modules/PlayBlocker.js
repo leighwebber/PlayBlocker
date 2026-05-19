@@ -271,6 +271,11 @@ async function playBlockerPageSetup() {
     speakerAreaElement.addEventListener("mousedown",   onSpeakerDivMouseDown);
     document.addEventListener("mouseup", hideMovementPeek);
 
+    // Block all interaction outside edit artifacts while in edit mode
+    ["pointerdown", "click", "contextmenu"].forEach(type =>
+        document.addEventListener(type, blockOutsideEditArtifacts, true)
+    );
+
     // Populate speaker icons in the speaker panel
     await insertSpeakers(speakerAreaElement);
 
@@ -1744,6 +1749,22 @@ function hideMovementPeek() {
 }
 
 // ---------------------------------------------------------------------------
+// Edit-mode interaction blocker
+// ---------------------------------------------------------------------------
+
+/**
+ * Capture-phase handler that swallows all pointer/click/contextmenu events
+ * while in edit mode, unless they originate from an edit artifact or the
+ * context menu popup itself.
+ */
+function blockOutsideEditArtifacts(e) {
+    if (!inEditMode) return;
+    if (e.target.closest(".edit-artifact, #pb-context-menu")) return;
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+// ---------------------------------------------------------------------------
 // Context menu
 // ---------------------------------------------------------------------------
 
@@ -1913,8 +1934,15 @@ function enterEditMode(speaker) {
     editShadow.id            = `edit-shadow-div-${speaker.speakerInitials}`;
     editShadow.style.zIndex  = "100";
     editShadow.style.pointerEvents = "auto";
+    editShadow.classList.add("edit-artifact");
     speakerAreaElement.appendChild(editShadow);
     editState.shadowDiv = editShadow;
+
+    // Mark the speaker div as an edit artifact so the blocker lets it through
+    speaker.speakerDiv.classList.add("edit-artifact");
+
+    // Disable pointer events on the script iframe to prevent cursor moves during edit
+    myIframe.style.pointerEvents = "none";
 
     // Create waypoint markers
     movData.waypoints.forEach((wp, i) => {
@@ -1922,6 +1950,7 @@ function enterEditMode(speaker) {
         const markerY = wp.rY * imgRect.height + (imgRect.top  - areaRect.top)  - 5;
         const markerDiv = createMovementMarkerDiv(markerX, markerY, speaker.backgroundColor, markerCount++);
         markerDiv.style.pointerEvents = "auto";
+        markerDiv.classList.add("edit-artifact");
         markerDiv._rp = { rX: wp.rX, rY: wp.rY };
         speakerAreaElement.appendChild(markerDiv);
         editState.markerDivs.push(markerDiv);
@@ -2089,6 +2118,9 @@ function cancelEdit() {
 /** Tears down all edit-mode DOM elements and resets state flags. */
 function cleanupEditMode() {
     if (!editState) return;
+    const speaker = speakers.find(s => s.speakerInitials === editState.speakerInitials);
+    speaker?.speakerDiv.classList.remove("edit-artifact");
+    myIframe.style.pointerEvents = "";
     editState.markerDivs.forEach(div => { interact(div).unset(); div.remove(); });
     editState.shadowDiv?.remove();
     editState = null;
