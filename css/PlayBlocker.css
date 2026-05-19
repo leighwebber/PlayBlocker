@@ -239,3 +239,45 @@ iframe {
 }
 #pb-confirm-ok     { background: #007bff; color: white; }
 #pb-confirm-cancel { background: #d0d0d0; color: #333; }
+
+/* Help button — shared by title bar and zone badges */
+.pb-help-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid #aaa;
+  background: #f0f6ff;
+  color: #007bff;
+  font-size: 11px;
+  font-weight: bold;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  line-height: 1;
+  user-select: none;
+  flex-shrink: 0;
+}
+.pb-help-btn:hover { background: #007bff; color: white; border-color: #007bff; }
+
+/* Zone badge — absolutely positioned inside a position:relative container */
+.pb-zone-help {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 500;
+}
+
+/* State-aware workflow hint bar */
+#pb-help-bar {
+  font-size: 12px;
+  color: #555;
+  padding: 4px 12px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+  min-height: 22px;
+}
+
+/* Script zone needs relative positioning for zone badge */
+.script { position: relative; }

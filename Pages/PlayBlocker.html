@@ -61,16 +61,19 @@
 </head>
 <body id="playBlockerPage">
     <p><span class="app-title">PlayBlocker</span>
-        <button id="saveScript">Save</button></p>
+        <button id="saveScript">Save</button>
+        <a class="pb-help-btn" href="/Pages/help.html" target="_blank" title="Help">?</a></p>
 
+    <div id="pb-help-bar"></div>
     <div id="message"></div>
-    <div id="grid-container" class="grid-container">        
+    <div id="grid-container" class="grid-container">
         <div id="image-area" class="image-area">
-            <img id="stage-image" class="stage-image" src="../Assets/And Then There Were None.png" alt="Stage diagram" />            
+            <img id="stage-image" class="stage-image" src="../Assets/And Then There Were None.png" alt="Stage diagram" />
+            <a class="pb-help-btn pb-zone-help" href="/Pages/help.html#stage" target="_blank" title="Stage image help">?</a>
         </div>
         <div id="play-script" class="script">
-            
-            <iframe id="script-iframe" src="/Pages/script.html" title="PlayBlocker Script" 
+            <a class="pb-help-btn pb-zone-help" href="/Pages/help.html#script" target="_blank" title="Script area help">?</a>
+            <iframe id="script-iframe" src="/Pages/script.html" title="PlayBlocker Script"
                 name="iframe-script" width="100%" ></iframe>
         </div>
         <div id="slidecontainer" class="slidecontainer" style="visibility: hidden;">

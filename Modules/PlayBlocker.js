@@ -259,8 +259,9 @@ async function playBlockerPageSetup() {
         slider.blur();
     };
 
-    // Download button
     document.getElementById("saveScript").addEventListener("click", saveProductionState);
+
+    setHelpBar("Left-click in the script to move the cursor · Right-click a Speech to start a movement · Hold a speaker icon to preview their path");
 
     // Context menu for speaker/edit artifacts
     const menuEl = document.createElement("div");
@@ -969,6 +970,16 @@ function speakerInitialsFromDiv(div) {
 }
 
 // ---------------------------------------------------------------------------
+// Help bar
+// ---------------------------------------------------------------------------
+
+/** Updates the state-aware hint bar above the grid with a workflow prompt. */
+function setHelpBar(text) {
+    const bar = document.getElementById("pb-help-bar");
+    if (bar) bar.textContent = text;
+}
+
+// ---------------------------------------------------------------------------
 // File handling
 // ---------------------------------------------------------------------------
 
@@ -1207,6 +1218,7 @@ function handleEscapeKey() {
     dataStore.newMovement = null;
     document.body.style.cursor = "default";
     myIframe.contentDocument.body.style.cursor = "text";
+    setHelpBar("Left-click in the script to move the cursor · Right-click a Speech to start a movement · Hold a speaker icon to preview their path");
 }
 
 /**
@@ -1225,6 +1237,7 @@ function startMovement(e, paragraphOffset = null) {
     const newMovement = new Movement(myIframe, imageAreaDiv, dataStore, e.target, offset);
     dataStore.newMovement = newMovement;
     window.focus();
+    setHelpBar("Drag the actor who is moving onto the stage image · Press Escape to cancel");
 }
 
 /**
@@ -1587,7 +1600,8 @@ interact(".draggable").draggable({
                 // Promote newMovement → incompleteMovement (has a speaker, needs a drop)
                 dataStore.incompleteMovement = dataStore.newMovement;
                 dataStore.incompleteMovement.speakerDiv = event.target;
-                dataStore.newMovement = null; // Prevents new movements while dragging
+                dataStore.newMovement = null;
+                setHelpBar("Press Spacebar to mark waypoints along the path · Drop on the stage to finish");
 
                 // Remove all visual traces of completed movements: shadow divs and
                 // movement markers (each contains its own connector path in its SVG)
@@ -1781,6 +1795,7 @@ interact(".stage-image").dropzone({
 
             dataStore.incompleteMovement = null;
             isDirty = true;
+            setHelpBar("Left-click in the script to move the cursor · Right-click a Speech to start a movement · Hold a speaker icon to preview their path");
 
             // Remove the shadow and waypoint markers now that the movement is saved
             speakerAreaElement.querySelectorAll('[id^="shadow-div-"], .movement-marker').forEach(el => el.remove());
@@ -2041,6 +2056,7 @@ function enterEditMode(speaker) {
     }
 
     inEditMode = true;
+    setHelpBar("Drag the ghost (start) or actor icon (end) or any waypoint · Right-click to Save or Cancel");
     editState  = {
         spanId:             editSpanId,
         dbId:               movData.dbId,
@@ -2261,6 +2277,7 @@ function cleanupEditMode() {
     editState.shadowDiv?.remove();
     editState = null;
     inEditMode = false;
+    setHelpBar("Left-click in the script to move the cursor · Right-click a Speech to start a movement · Hold a speaker icon to preview their path");
 }
 
 /**
