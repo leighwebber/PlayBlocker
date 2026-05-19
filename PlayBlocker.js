@@ -1111,6 +1111,10 @@ interact(".draggable").draggable({
                 dataStore.incompleteMovement.speakerDiv = event.target;
                 dataStore.newMovement = null; // Prevents new movements while dragging
 
+                // Remove all visual traces of completed movements: shadow divs and
+                // movement markers (each contains its own connector path in its SVG)
+                speakerAreaElement.querySelectorAll('[id^="shadow-div-"], .movement-marker').forEach(el => el.remove());
+
                 // Place the shadow icon at the drag-start position
                 const shadowDiv = speaker.shadowDiv;
                 shadowDiv.style.transform = event.target.style.transform;
