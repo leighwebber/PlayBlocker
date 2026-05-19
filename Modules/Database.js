@@ -179,6 +179,27 @@ export async function updateMovement(movementId, data) {
 }
 
 // ---------------------------------------------------------------------------
+// Movements — deleteMovement
+// ---------------------------------------------------------------------------
+
+/**
+ * Deletes a movement and its child rows (waypoints, speaker positions) from the server.
+ * The database cascades the deletes via foreign-key constraints.
+ *
+ * @param {number} movementId - The movements.id PK
+ * @returns {Promise<void>}
+ */
+export async function deleteMovement(movementId) {
+    const response = await fetch(`${API_URL}/movements/${movementId}`, {
+        method:      "DELETE",
+        credentials: "include",
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to delete movement: ${response.statusText}`);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Movements — fetchMovements
 // ---------------------------------------------------------------------------
 

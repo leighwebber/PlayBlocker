@@ -42,6 +42,7 @@ import {
     fetchMovements,
     fetchProduction,
     updateMovement,
+    deleteMovement,
 } from "../Modules/Database.js";
 
 // ---------------------------------------------------------------------------
@@ -306,6 +307,17 @@ async function playBlockerPageSetup() {
     myIframe.contentWindow.addEventListener("contextmenu", async (event) => {
         event.preventDefault();
         event.stopPropagation();
+
+        // Right-clicking a movement marker span opens a Delete option
+        const markerSpan = event.target.closest("span.m-normal");
+        if (markerSpan) {
+            if (inEditMode || dataStore.newMovement || dataStore.incompleteMovement) return;
+            const iframeRect = myIframe.getBoundingClientRect();
+            showContextMenu(event.clientX + iframeRect.left, event.clientY + iframeRect.top, [
+                { label: "Delete movement", action: () => deleteMovementAtSpan(markerSpan.id) },
+            ]);
+            return;
+        }
 
         if (event.target.className !== "Speech" && event.target.className !== "StageDirection") {
             alert("You can only create a movement inside the text of a Speech or a StageDirection");
@@ -1797,6 +1809,18 @@ interact(".stage-image").dropzone({
             isDirty = true;
             setHelpBar("Left-click in the script to move the cursor · Right-click a Speech to start a movement · Hold a speaker icon to preview their path");
 
+            // Cascade: update snapshot data in all following movements up to and including
+            // the I-Speaker's next movement (whose shadowRP also needs updating).
+            if (spanId && speakerObj.RP) {
+                try {
+                    await cascadeInsert(myIframe.contentDocument, spanId,
+                        speakerObj.speakerInitials,
+                        { rX: speakerObj.RP.rX, rY: speakerObj.RP.rY });
+                } catch (err) {
+                    console.error("cascadeInsert failed:", err);
+                }
+            }
+
             // Remove the shadow and waypoint markers now that the movement is saved
             speakerAreaElement.querySelectorAll('[id^="shadow-div-"], .movement-marker').forEach(el => el.remove());
         }
@@ -2304,4 +2328,135 @@ async function updateSpeakerInSnapshot(spanId, speakerInitials, newRP) {
     } catch (err) {
         console.error(`updateSpeakerInSnapshot(${spanId}) failed:`, err);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Cascade helpers — keep snapshot data consistent after insert or delete
+// ---------------------------------------------------------------------------
+
+/**
+ * After a new movement is dropped, propagates the I-Speaker's new end position
+ * into the snapshot of every following movement, stopping after the first
+ * following movement that belongs to the I-Speaker (whose shadowRP is also
+ * updated so the path remains continuous).
+ *
+ * @param {Document} iframeDoc
+ * @param {string}   newSpanId        - The span id of the newly completed movement
+ * @param {string}   iSpeakerInitials - Initials of the actor who just moved
+ * @param {{rX,rY}}  newEndRP         - Where the I-Speaker ended up
+ */
+async function cascadeInsert(iframeDoc, newSpanId, iSpeakerInitials, newEndRP) {
+    const allSpans = Array.from(iframeDoc.querySelectorAll("span.m-normal"));
+    const startIdx = allSpans.findIndex(s => s.id === newSpanId);
+    if (startIdx < 0) return;
+
+    for (let i = startIdx + 1; i < allSpans.length; i++) {
+        const spanId = allSpans[i].id;
+        const isISpeakerMovement = movementAnchorData.get(spanId)?.moverInitials === iSpeakerInitials;
+
+        await updateSpeakerInSnapshot(spanId, iSpeakerInitials, newEndRP);
+
+        if (isISpeakerMovement) {
+            // This is the I-Speaker's next movement; its shadow must now start at newEndRP.
+            const movData = completedMovements.get(spanId);
+            if (movData) {
+                try {
+                    await updateMovement(movData.dbId, { shadowRpX: newEndRP.rX, shadowRpY: newEndRP.rY });
+                    completedMovements.set(spanId, { ...movData, shadowRP: { ...newEndRP } });
+                } catch (err) {
+                    console.error("cascadeInsert: shadowRP update failed:", err);
+                }
+            }
+            break;
+        }
+    }
+}
+
+/**
+ * Deletes the movement associated with `spanId`, then cascades the D-Speaker's
+ * prior position into every following movement's snapshot, stopping after the
+ * D-Speaker's next movement (whose shadowRP is also corrected).
+ *
+ * @param {string} spanId - The m-N span id of the movement to delete
+ */
+async function deleteMovementAtSpan(spanId) {
+    if (inEditMode || dataStore.newMovement || dataStore.incompleteMovement) return;
+
+    const iframeDoc = myIframe.contentDocument;
+    const span      = iframeDoc.getElementById(spanId);
+    if (!span) return;
+
+    const anchor           = movementAnchorData.get(spanId);
+    const dSpeakerInitials = anchor?.moverInitials;
+    const movData          = completedMovements.get(spanId);
+
+    // Snapshot all span IDs in DOM order before we remove the span
+    const allSpans   = Array.from(iframeDoc.querySelectorAll("span.m-normal"));
+    const deletedIdx = allSpans.findIndex(s => s.id === spanId);
+
+    // D-Speaker's position just before the deleted movement — scan preceding snapshots
+    let dSpeakerPriorRP = null;
+    for (let i = deletedIdx - 1; i >= 0; i--) {
+        const found = movementPositions.get(allSpans[i].id)
+            ?.find(sp => sp.initials === dSpeakerInitials);
+        if (found) { dSpeakerPriorRP = { rX: found.rX, rY: found.rY }; break; }
+    }
+    // Fallback: initial placement RP if no preceding snapshot contains the D-Speaker
+    if (!dSpeakerPriorRP) {
+        const speaker = speakers.find(s => s.speakerInitials === dSpeakerInitials);
+        if (speaker?.RP) dSpeakerPriorRP = { rX: speaker.RP.rX, rY: speaker.RP.rY };
+    }
+
+    const followingSpanIds = allSpans.slice(deletedIdx + 1).map(s => s.id);
+
+    // Remove span from DOM
+    const parent = span.parentNode;
+    span.remove();
+    parent?.normalize();
+
+    // Delete from server
+    if (movData?.dbId != null) {
+        try { await deleteMovement(movData.dbId); }
+        catch (err) { console.error("deleteMovementAtSpan: server delete failed:", err); }
+    }
+
+    // Remove from in-memory maps
+    completedMovements.delete(spanId);
+    movementPositions.delete(spanId);
+    movementAnchorData.delete(spanId);
+
+    // Cascade: fix following movements' snapshot data
+    if (dSpeakerInitials && dSpeakerPriorRP) {
+        for (const followingId of followingSpanIds) {
+            if (!movementAnchorData.has(followingId)) continue;
+            const isDSpeakerMovement = movementAnchorData.get(followingId)?.moverInitials === dSpeakerInitials;
+
+            await updateSpeakerInSnapshot(followingId, dSpeakerInitials, dSpeakerPriorRP);
+
+            if (isDSpeakerMovement) {
+                // This movement's shadow must now start where D-Speaker was before the deleted movement
+                const nextMovData = completedMovements.get(followingId);
+                if (nextMovData) {
+                    try {
+                        await updateMovement(nextMovData.dbId, { shadowRpX: dSpeakerPriorRP.rX, shadowRpY: dSpeakerPriorRP.rY });
+                        completedMovements.set(followingId, { ...nextMovData, shadowRP: { ...dSpeakerPriorRP } });
+                    } catch (err) {
+                        console.error("deleteMovementAtSpan: shadowRP cascade failed:", err);
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    // Reposition speaker icons to reflect the cursor's now-current movement context
+    const cursor = iframeDoc.getElementById("script-cursor");
+    if (cursor) {
+        const cursorRange = iframeDoc.createRange();
+        cursorRange.selectNode(cursor);
+        const { targetPositions } = findTargetPositions(iframeDoc, cursorRange);
+        if (targetPositions) restoreSpeakerPositions(targetPositions);
+    }
+
+    isDirty = true;
 }
