@@ -667,6 +667,12 @@ export class Movement {
     get shadowRP()    { return this.#shadowRP; }
     set shadowRP(v)   { this.#shadowRP = v; }
 
+    /** The paragraph element that was right-clicked to create this movement. */
+    get containingPara() { return this.#element; }
+
+    /** Text character offset within the paragraph at the time of the right-click. */
+    get clickOffset()    { return this.#offset; }
+
     // ── Methods ───────────────────────────────────────────────────────────
 
     /**

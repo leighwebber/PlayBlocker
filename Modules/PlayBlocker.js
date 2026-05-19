@@ -78,6 +78,9 @@ let stageImageRect = null;
 /** Maps span id (e.g. "m-3") → speakerPositions snapshot for click-to-restore. */
 const movementPositions = new Map();
 
+/** Maps span id → { paraIndex, textOffset, moverInitials } for span reconstruction on load. */
+const movementAnchorData = new Map();
+
 /** The speaker panel container element. */
 let speakerAreaElement = null;
 
@@ -375,13 +378,103 @@ async function loadProductionData() {
 // ---------------------------------------------------------------------------
 
 /**
+ * Counts non-m-span text characters before the span with the given id within
+ * a paragraph element.  The result is stable: adding or removing m-spans does
+ * not change the raw count of surrounding plain text.
+ *
+ * @param {HTMLElement} paraElement - The containing paragraph
+ * @param {string}      spanId      - The id of the target span (e.g. "m-3")
+ * @returns {number}                - Raw text offset before the span
+ */
+function computeRawOffset(paraElement, spanId) {
+    let raw   = 0;
+    let found = false;
+
+    function walk(node) {
+        if (found) return;
+        if (node.nodeType === Node.TEXT_NODE) {
+            raw += node.length;
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            if (node.id === spanId) {
+                found = true;
+            } else if (node.classList.contains("m-normal") || node.classList.contains("m-new")) {
+                // Skip m-span text — it does not contribute to raw offset
+            } else {
+                for (const child of node.childNodes) {
+                    walk(child);
+                    if (found) break;
+                }
+            }
+        }
+    }
+
+    for (const child of paraElement.childNodes) {
+        walk(child);
+        if (found) break;
+    }
+
+    return raw;
+}
+
+/**
+ * Inserts `span` into `paraElement` at the position described by `rawOffset`
+ * (a count of non-m-span text characters from the start of the paragraph).
+ *
+ * @param {Document}    iframeDoc
+ * @param {HTMLElement} paraElement
+ * @param {number}      rawOffset
+ * @param {HTMLElement} span
+ */
+function insertSpanAtRawOffset(iframeDoc, paraElement, rawOffset, span) {
+    let remaining = rawOffset;
+    let inserted  = false;
+
+    function walk(node) {
+        if (inserted) return;
+        if (node.nodeType === Node.TEXT_NODE) {
+            if (remaining <= node.length) {
+                const range = iframeDoc.createRange();
+                range.setStart(node, remaining);
+                range.collapse(true);
+                range.insertNode(span);
+                inserted = true;
+            } else {
+                remaining -= node.length;
+            }
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            if (node.classList.contains("m-normal") || node.classList.contains("m-new")) {
+                // Skip — m-spans don't contribute to raw offset
+            } else {
+                for (const child of Array.from(node.childNodes)) {
+                    walk(child);
+                    if (inserted) break;
+                }
+            }
+        }
+    }
+
+    for (const child of Array.from(paraElement.childNodes)) {
+        walk(child);
+        if (inserted) break;
+    }
+
+    if (!inserted) {
+        // rawOffset exceeds paragraph text length — append at end
+        const range = iframeDoc.createRange();
+        range.selectNodeContents(paraElement);
+        range.collapse(false);
+        range.insertNode(span);
+    }
+}
+
+/**
  * Cross-checks the iframe DOM against the movementPositions Map (populated
  * from the DB) and repairs any inconsistencies found.
  *
  * Rules:
  *  - span.m-new  ("?") → always remove; these are from interrupted movements.
  *  - span.m-normal with no DB record → remove; script drifted ahead of the DB.
- *  - DB record with no span → warn only; we cannot reconstruct the span position.
+ *  - DB record with no span → reconstruct using stored para_index + text_offset anchor data.
  *
  * @param {Document} iframeDoc
  * @returns {boolean} true if any repairs were made (caller should set isDirty)
@@ -409,11 +502,30 @@ function validateScriptConsistency(iframeDoc) {
         }
     });
 
-    // Warn about DB records that have no matching span in the script
+    // Reconstruct DB records whose spans are missing from the script
     movementPositions.forEach((_, spanId) => {
-        if (!iframeDoc.getElementById(spanId)) {
-            console.warn(`validateScriptConsistency: DB movement ${spanId} has no span in script.`);
+        if (iframeDoc.getElementById(spanId)) return;
+
+        const anchor = movementAnchorData.get(spanId);
+        if (!anchor || anchor.paraIndex == null || anchor.textOffset == null) {
+            console.warn(`validateScriptConsistency: DB movement ${spanId} has no span and no anchor data — cannot reconstruct.`);
+            return;
         }
+
+        const allParas = iframeDoc.querySelectorAll("p");
+        const para = allParas[anchor.paraIndex];
+        if (!para) {
+            console.warn(`validateScriptConsistency: DB movement ${spanId} — paragraph at index ${anchor.paraIndex} not found.`);
+            return;
+        }
+
+        const span = iframeDoc.createElement("span");
+        span.id          = spanId;
+        span.className   = "m-normal";
+        span.textContent = `[${anchor.moverInitials ?? "?"}]`;
+        insertSpanAtRawOffset(iframeDoc, para, anchor.textOffset, span);
+        repaired = true;
+        console.log(`validateScriptConsistency: reconstructed missing span ${spanId} at para ${anchor.paraIndex}, rawOffset ${anchor.textOffset}.`);
     });
 
     return repaired;
@@ -1083,8 +1195,9 @@ function attachIFrameListeners() {
 async function loadMovementPositions() {
     try {
         const movements = await fetchMovements(dataStore.productionId);
-        movements.forEach(({ markerId, speakerPositions }) => {
+        movements.forEach(({ markerId, paraIndex, textOffset, moverInitials, speakerPositions }) => {
             movementPositions.set(`m-${markerId}`, speakerPositions);
+            movementAnchorData.set(`m-${markerId}`, { paraIndex, textOffset, moverInitials });
         });
     } catch (err) {
         console.error("loadMovementPositions failed:", err);
@@ -1421,8 +1534,19 @@ interact(".stage-image").dropzone({
                 .map(s => ({ initials: s.speakerInitials, speakerId: s.dbId, rX: s.RP.rX, rY: s.RP.rY }));
             const spanId = dataStore.incompleteMovement.node?.id;
             if (spanId) movementPositions.set(spanId, dataStore.incompleteMovement.speakerPositions);
+
+            // Compute anchor data for future span reconstruction
+            const movSpan    = dataStore.incompleteMovement.node;
+            const movPara    = movSpan?.parentElement ?? dataStore.incompleteMovement.containingPara;
+            const iframeDoc  = myIframe.contentDocument;
+            const allParas   = Array.from(iframeDoc.querySelectorAll("p"));
+            const paraIndex  = movPara ? allParas.indexOf(movPara) : null;
+            const rawOffset  = (movSpan && movPara) ? computeRawOffset(movPara, movSpan.id) : null;
+
+            if (spanId) movementAnchorData.set(spanId, { paraIndex, textOffset: rawOffset, moverInitials: speakerObj.speakerInitials });
+
             try {
-                await saveMovement(dataStore.incompleteMovement, speakerObj.dbId, dataStore.productionId);
+                await saveMovement(dataStore.incompleteMovement, speakerObj.dbId, dataStore.productionId, paraIndex, rawOffset);
             } catch (err) {
                 console.error("saveMovement failed:", err);
             }

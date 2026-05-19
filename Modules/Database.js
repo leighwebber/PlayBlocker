@@ -85,7 +85,7 @@ export async function saveSpeakers(speakers) {
  * @param {number} speakerDbId  - The speakers.id PK for the moving speaker
  * @returns {Promise<void>}
  */
-export async function saveMovement(movement, speakerDbId, productionId) {
+export async function saveMovement(movement, speakerDbId, productionId, paraIndex, textOffset) {
     // Extract the numeric index from the movement's span id, e.g. "m-3" → 3
     const markerId = parseInt(movement.node?.id?.split("-").pop(), 10);
 
@@ -111,6 +111,8 @@ export async function saveMovement(movement, speakerDbId, productionId) {
         waypoints,
         speakerPositions,
         productionId,
+        paraIndex:       paraIndex ?? null,
+        textOffset:      textOffset ?? null,
     };
 
     const response = await fetch(`${API_URL}/movements`, {
