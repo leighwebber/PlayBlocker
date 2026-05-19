@@ -1134,6 +1134,10 @@ function handleKeyDown(event) {
         case "Escape":
             handleEscapeKey();
             break;
+        case "Tab":
+            event.preventDefault();
+            navigateToSpeech(event.shiftKey ? "prev" : "next");
+            break;
         case "ArrowUp":
             myIframe.contentWindow.scrollBy(0, -30);
             break;
@@ -1147,6 +1151,65 @@ function handleKeyDown(event) {
             scrollToAdjacentPage("down");
             break;
     }
+}
+
+/**
+ * Moves the cursor to the next or previous Speech paragraph in the script.
+ * Tab advances; Shift+Tab retreats.  Speaker positions update as normal.
+ *
+ * @param {"next"|"prev"} direction
+ */
+function navigateToSpeech(direction) {
+    const iframeDoc  = myIframe.contentDocument;
+    const speechParas = Array.from(iframeDoc.querySelectorAll("p.Speech"));
+    if (speechParas.length === 0) return;
+
+    const cursor = iframeDoc.getElementById("script-cursor");
+
+    let target = null;
+
+    if (direction === "next") {
+        if (!cursor) {
+            target = speechParas[0];
+        } else {
+            const cursorRange = iframeDoc.createRange();
+            cursorRange.selectNode(cursor);
+            for (const para of speechParas) {
+                const paraRange = iframeDoc.createRange();
+                paraRange.selectNodeContents(para);
+                // Find first Speech whose start is strictly after the cursor
+                if (paraRange.compareBoundaryPoints(Range.START_TO_START, cursorRange) > 0) {
+                    target = para;
+                    break;
+                }
+            }
+        }
+    } else {
+        if (cursor) {
+            const cursorRange = iframeDoc.createRange();
+            cursorRange.selectNode(cursor);
+            for (const para of [...speechParas].reverse()) {
+                const paraRange = iframeDoc.createRange();
+                paraRange.selectNodeContents(para);
+                // Find last Speech whose end is strictly before the cursor
+                if (paraRange.compareBoundaryPoints(Range.END_TO_START, cursorRange) < 0) {
+                    target = para;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!target) return;
+
+    const range = iframeDoc.createRange();
+    range.setStart(target, 0);
+    range.collapse(true);
+
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    const { targetPositions } = findTargetPositions(iframeDoc, range);
+    commitCursorMove(iframeDoc, range, targetPositions);
 }
 
 /**
