@@ -1,72 +1,379 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <script>
-        (async function validateSession() {
-            const VALIDATE_URL = "https://lwebber.ca/api/validate";
-
-            // Pages that should never trigger a redirect (e.g. the login page itself)
-            const PUBLIC_PATHS = ["/login", "/login.html"];
-
-            const isPublicPage = PUBLIC_PATHS.some(p =>
-                window.location.pathname === p || window.location.pathname.startsWith(p)
-            );
-
-            try {
-                const response = await fetch(VALIDATE_URL, {
-                    method: "GET",
-                    credentials: "include",   // sends the httpOnly cookie automatically
-                    headers: {
-                    "Accept": "application/json"
-                    }
-                });
-
-                if (response.ok) {
-                    // Token is valid — optionally expose the payload to the page
-                    const data = await response.json().catch(() => null);
-                    if (data) {
-                    // Store non-sensitive info for the rest of the page to use
-                    window.__session = data;
-                    const setUsername = () => {
-                        const el = document.getElementById("username");
-                        if (el) {
-                            el.textContent = [data.first_name, data.last_name].filter(Boolean).join(" ");
-                        }
-                    };
-                    if (document.readyState === "loading") {
-                        document.addEventListener("DOMContentLoaded", setUsername);
-                    } else {
-                        setUsername();
-                    }
-                    }
-                } else {
-                    // 401 / 403 → token missing, expired, or invalid
-                    if (!isPublicPage) {
-                    window.location.href = "/login.html?reason=session_expired";
-                    }
-                }
-            } catch (err) {
-                // Network error or server unreachable
-                console.warn("[auth] Validation request failed:", err);
-                if (!isPublicPage) {
-                    window.location.href = "/login?reason=network_error";
-                }
-            }
-        })();
-    </script>
-
-
-
-
     <meta charset="utf-8">
     <title>Dramatic Productions</title>
-    <script type="module" src="../node_modules/interactjs/dist/interact.min.js"></script>
-    <link rel="stylesheet" href="../css/PlayBlocker.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Lucida Sans', Geneva, Verdana, sans-serif;
+            font-size: 14px;
+            background: #f5f5f5;
+            color: #333;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 20px;
+            background: #fff;
+            border-bottom: 1px solid #ddd;
+            flex-shrink: 0;
+        }
+
+        header h1 {
+            font-size: 18pt;
+            font-family: 'Gill Sans', Calibri, 'Trebuchet MS', sans-serif;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        #username { font-weight: bold; }
+
+        .link-btn {
+            padding: 5px 12px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 13px;
+            cursor: pointer;
+            border: none;
+        }
+        .link-btn:hover { background: #0056b3; }
+        .link-btn.secondary { background: #6c757d; }
+        .link-btn.secondary:hover { background: #545b62; }
+        .link-btn.danger { background: #dc3545; }
+        .link-btn.danger:hover { background: #b02a37; }
+
+        main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* ---- Left panel: production list ---- */
+        #list-panel {
+            width: 220px;
+            min-width: 180px;
+            background: #f0f0f0;
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #list-panel-header {
+            padding: 10px 12px;
+            border-bottom: 1px solid #ddd;
+            background: #e8e8e8;
+        }
+
+        #new-production-btn {
+            width: 100%;
+            padding: 7px 10px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            text-align: left;
+        }
+        #new-production-btn:hover { background: #1e7e34; }
+
+        #production-list {
+            list-style: none;
+            overflow-y: auto;
+            flex: 1;
+            padding: 6px;
+        }
+
+        .production-item {
+            padding: 8px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 2px 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .production-item:hover { background: #ddd; }
+        .production-item.selected { background: #007bff; color: white; }
+
+        /* ---- Right panel: detail ---- */
+        #detail-panel {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            background: #fff;
+        }
+
+        #detail-empty {
+            color: #999;
+            margin-top: 40px;
+            text-align: center;
+            font-size: 15px;
+        }
+
+        .detail-section {
+            margin-bottom: 28px;
+            padding-bottom: 28px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .detail-section:last-child { border-bottom: none; }
+
+        .detail-section h3 {
+            margin-bottom: 12px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #666;
+        }
+
+        .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+        input[type="text"] {
+            padding: 6px 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        input[type="text"]:focus { outline: none; border-color: #007bff; }
+
+        #production-name { width: 280px; }
+
+        /* File upload labels styled as buttons */
+        .upload-label {
+            display: inline-block;
+            padding: 6px 14px;
+            background: #007bff;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .upload-label:hover { background: #0056b3; }
+
+        #image-preview {
+            display: block;
+            max-width: 400px;
+            max-height: 220px;
+            margin-top: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        #script-status {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #555;
+        }
+
+        /* ---- Speakers table ---- */
+        #speakers-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 14px;
+        }
+
+        #speakers-table th {
+            background: #f0f0f0;
+            padding: 7px 10px;
+            text-align: left;
+            border: 1px solid #ddd;
+            font-size: 13px;
+        }
+
+        #speakers-table td {
+            padding: 5px 8px;
+            border: 1px solid #ddd;
+            vertical-align: middle;
+        }
+
+        .speaker-input {
+            padding: 4px 7px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-size: 13px;
+            font-family: inherit;
+            width: 100%;
+        }
+
+        .speaker-input:focus { outline: none; border-color: #007bff; }
+
+        td.col-script  { min-width: 120px; color: #555; font-style: italic; }
+        td.col-fname   { width: 130px; }
+        td.col-lname   { width: 130px; }
+        td.col-init    { width: 60px; }
+        td.col-color   { width: 200px; }
+
+        .color-input-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .color-preview {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 1px solid #999;
+            border-radius: 3px;
+            flex-shrink: 0;
+            background: transparent;
+        }
+
+        .color-btn {
+            padding: 3px 8px;
+            border: 1px solid #bbb;
+            border-radius: 3px;
+            background: #f8f8f8;
+            cursor: pointer;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+        .color-btn:hover { background: #e8e8e8; }
+
+        /* ---- Color picker popup ---- */
+        #color-picker-popup {
+            position: fixed;
+            background: white;
+            border: 1px solid #bbb;
+            border-radius: 6px;
+            padding: 8px;
+            z-index: 2000;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+            width: 300px;
+        }
+
+        #color-picker-popup input[type="text"] {
+            width: 100%;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        #color-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px;
+        }
+
+        .color-swatch {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            border: 1px solid rgba(0,0,0,0.15);
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+
+        .color-swatch:hover {
+            transform: scale(1.3);
+            border-color: #333;
+            z-index: 1;
+            position: relative;
+        }
+
+        .open-btn-row {
+            margin-top: 10px;
+        }
+    </style>
 </head>
-<body id="productionsPage">
+<body>
+
+<header>
     <h1>Dramatic Productions</h1>
-    <p>Manage dramatic productions for <span id="username">user</span></p>
- 
+    <div class="header-right">
+        <span>Logged in as <span id="username"></span></span>
+        <button class="link-btn secondary" id="logout-btn">Log out</button>
+    </div>
+</header>
+
+<main>
+    <div id="list-panel">
+        <div id="list-panel-header">
+            <button id="new-production-btn">+ New Production</button>
+        </div>
+        <ul id="production-list"></ul>
+    </div>
+
+    <div id="detail-panel">
+        <p id="detail-empty">Select or create a production to get started.</p>
+
+        <div id="detail-content" hidden>
+
+            <!-- Name & actions -->
+            <div class="detail-section">
+                <h3>Production</h3>
+                <div class="row">
+                    <input type="text" id="production-name" placeholder="Production name">
+                    <button class="link-btn" id="save-name-btn">Save</button>
+                    <button class="link-btn danger" id="delete-production-btn">Delete</button>
+                    <a class="link-btn secondary" id="open-playblocker-btn" href="#">Open in PlayBlocker</a>
+                </div>
+            </div>
+
+            <!-- Stage image -->
+            <div class="detail-section">
+                <h3>Stage Image</h3>
+                <label class="upload-label">
+                    Upload Image
+                    <input type="file" id="image-file-input" accept="image/*" hidden>
+                </label>
+                <img id="image-preview" alt="Stage image preview" hidden>
+            </div>
+
+            <!-- Script -->
+            <div class="detail-section">
+                <h3>Script (HTML)</h3>
+                <label class="upload-label">
+                    Upload Script
+                    <input type="file" id="script-file-input" accept=".html,.htm" hidden>
+                </label>
+                <p id="script-status"></p>
+            </div>
+
+            <!-- Speakers (shown once script is loaded) -->
+            <div class="detail-section" id="speakers-section" hidden>
+                <h3>Speakers</h3>
+                <table id="speakers-table">
+                    <thead>
+                        <tr>
+                            <th>Script Name</th>
+                            <th>First Name</th>
+                            <th>Last Name</th>
+                            <th>Initials</th>
+                            <th>Color</th>
+                        </tr>
+                    </thead>
+                    <tbody id="speakers-tbody"></tbody>
+                </table>
+                <button class="link-btn" id="save-speakers-btn">Save Speakers</button>
+            </div>
+
+        </div>
+    </div>
+</main>
+
+<!-- Color picker popup -->
+<div id="color-picker-popup" hidden>
+    <input type="text" id="color-search" placeholder="Filter colors…">
+    <div id="color-grid"></div>
+</div>
+
+<script type="module" src="../Modules/Productions.js"></script>
 </body>
 </html>
-
