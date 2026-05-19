@@ -194,12 +194,6 @@ if (document.getElementById("loginForm")) {
  * page body id is "playBlockerPage".
  */
 async function playBlockerPageSetup() {
-    // Show the chosen file name in the UI when a file is selected
-    document.getElementById("fileInput").addEventListener("change", function () {
-        const fileName = this.files[0] ? this.files[0].name : "No file selected";
-        document.getElementById("file-name").textContent = fileName;
-    });
-
     // Create the central state store, referencing the script iframe
     myIframe  = document.getElementById("script-iframe");
     dataStore = new DataStore(myIframe);
@@ -235,9 +229,6 @@ async function playBlockerPageSetup() {
 
     // Download button
     document.getElementById("saveScript").addEventListener("click", saveScript);
-
-    // File selection handler
-    document.getElementById("fileInput").addEventListener("change", handleFileSelection);
 
     // Populate speaker icons in the speaker panel
     await insertSpeakers(speakerAreaElement);
@@ -710,58 +701,6 @@ function xyToProportional(rawPosition) {
  *
  * @param {Event} event - The change event from the file input
  */
-function handleFileSelection(event) {
-    const file = event.target.files[0];
-
-    if (!file) {
-        showMessage("No file selected. Please choose a file.", "error");
-        return;
-    }
-    if (!file.type.startsWith("text")) {
-        showMessage("Unsupported file type. Please select a text/HTML file.", "error");
-        return;
-    }
-
-    const reader = new FileReader();
-
-    reader.onload = () => {
-        // Write the file's HTML directly into the iframe body
-        myIframe.contentDocument.body.innerHTML = reader.result;
-
-        // Re-attach click handlers (they are lost when the body is replaced)
-        attachIFrameListeners();
-
-        // Reload persisted movement positions so click-to-restore works after a page reload
-        loadMovementPositions();
-
-        // Update state
-        dataStore.script.fileName    = file.name;
-        dataStore.script.htmlContent = myIframe.contentDocument.body.innerHTML;
-
-        const startingPage = getCurrentPageNumber(myIframe);
-        pageCount          = getTotalPageCount(myIframe);
-
-        dataStore.movementList.pageCount = pageCount;
-        dataStore.movementList.startPage = startingPage;
-
-        // Sync slider to the first visible page
-        slider.value     = startingPage;
-        output.innerHTML = slider.value;
-
-        // Show the download button and slider now that a script is loaded
-        document.getElementById("saveScript").style.visibility    = "visible";
-        document.getElementById("slidecontainer").style.visibility = "visible";
-
-        scriptLoaded = true;
-    };
-
-    reader.onerror = () => {
-        showMessage("Error reading the file. Please try again.", "error");
-    };
-
-    reader.readAsText(file);
-}
-
 /**
  * Displays a status message below the file input.
  *
