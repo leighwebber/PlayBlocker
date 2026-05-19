@@ -336,16 +336,13 @@ async function loadProductionData() {
         await waitForIframe();
         myIframe.contentDocument.body.innerHTML = production.script_body;
 
-        // The saved script contains spans like <span id="m-3">.  The Movement
-        // constructor assigns ids as "m-" + mList.count(), which resets to 1 on
-        // every page load.  Without this fix, the first new movement would get
-        // id "m-1" — but getElementById("m-1") then finds the OLD span from the
-        // saved script instead of the newly inserted [?] span, so the speaker
-        // setter updates the wrong element and the initials never appear.
-        //
-        // Advance the movementList past the highest existing id so new movements
-        // always get a never-before-seen id.  The sentinel objects are safe
-        // to add because every forEach loop guards with !movement.speakerDiv.
+        // Fetch DB movements first so validateScriptConsistency can cross-check.
+        await loadMovementPositions();
+        const repaired = validateScriptConsistency(myIframe.contentDocument);
+
+        // Advance movementList past the highest validated span ID so new movements
+        // always get a never-before-seen id (see comment in earlier commit).
+        // Sentinels are safe because every forEach loop guards with !movement.speakerDiv.
         const sentinel = { shadowDiv: null, shadowRP: null, speakerDiv: null };
         let maxMovementId = 0;
         myIframe.contentDocument.querySelectorAll("span.m-normal").forEach(span => {
@@ -357,7 +354,6 @@ async function loadProductionData() {
         }
 
         attachIFrameListeners();
-        await loadMovementPositions();
         restoreAtCursor();
 
         const startingPage = getCurrentPageNumber(myIframe);
@@ -370,8 +366,57 @@ async function loadProductionData() {
         document.getElementById("saveScript").style.visibility    = "visible";
         document.getElementById("slidecontainer").style.visibility = "visible";
         scriptLoaded = true;
-        isDirty = false;
+        isDirty = repaired; // prompt save if validation had to clean anything up
     }
+}
+
+// ---------------------------------------------------------------------------
+// Script consistency validation
+// ---------------------------------------------------------------------------
+
+/**
+ * Cross-checks the iframe DOM against the movementPositions Map (populated
+ * from the DB) and repairs any inconsistencies found.
+ *
+ * Rules:
+ *  - span.m-new  ("?") → always remove; these are from interrupted movements.
+ *  - span.m-normal with no DB record → remove; script drifted ahead of the DB.
+ *  - DB record with no span → warn only; we cannot reconstruct the span position.
+ *
+ * @param {Document} iframeDoc
+ * @returns {boolean} true if any repairs were made (caller should set isDirty)
+ */
+function validateScriptConsistency(iframeDoc) {
+    let repaired = false;
+
+    // Remove stray [?] spans left by interrupted movements
+    iframeDoc.querySelectorAll("span.m-new").forEach(span => {
+        const parent = span.parentNode;
+        span.remove();
+        parent?.normalize();
+        repaired = true;
+        console.warn("validateScriptConsistency: removed stale [?] span.");
+    });
+
+    // Remove m-normal spans that have no corresponding DB record
+    iframeDoc.querySelectorAll("span.m-normal").forEach(span => {
+        if (!movementPositions.has(span.id)) {
+            const parent = span.parentNode;
+            span.remove();
+            parent?.normalize();
+            repaired = true;
+            console.warn(`validateScriptConsistency: removed orphan span ${span.id} — no DB record.`);
+        }
+    });
+
+    // Warn about DB records that have no matching span in the script
+    movementPositions.forEach((_, spanId) => {
+        if (!iframeDoc.getElementById(spanId)) {
+            console.warn(`validateScriptConsistency: DB movement ${spanId} has no span in script.`);
+        }
+    });
+
+    return repaired;
 }
 
 // ---------------------------------------------------------------------------
