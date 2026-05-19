@@ -122,6 +122,15 @@ let imgLeftNew = 0, imgTopNew  = 0, imgWidthNew = 0, imgHeightNew = 0;
 /** The script-display iframe element. */
 let myIframe = null;
 
+/** Last known iframe scroll position — used to detect scroll direction. */
+let lastScrollY = 0;
+
+/** Timer handle for the scroll-idle debounce. */
+let scrollIdleTimer = null;
+
+/** True while the user is dragging the page-navigation slider thumb. */
+let sliderDragging = false;
+
 /**
  * When false, right-click in the iframe shows our custom movement-start handler
  * rather than the browser's default context menu.
@@ -250,6 +259,8 @@ async function playBlockerPageSetup() {
     output = document.getElementById("demo");
     output.innerHTML = slider.value;
 
+    slider.addEventListener("pointerdown", () => { sliderDragging = true;  });
+    slider.addEventListener("change",      () => { sliderDragging = false; });
     slider.addEventListener("change", sliderOnChange);
     slider.oninput = function () {
         output.innerHTML = this.value;
@@ -266,6 +277,20 @@ async function playBlockerPageSetup() {
     menuEl.className = "pb-context-menu";
     document.body.appendChild(menuEl);
     document.addEventListener("click", () => hideContextMenu());
+
+    // Confirmation modal
+    const confirmOverlay = document.createElement("div");
+    confirmOverlay.id        = "pb-confirm-overlay";
+    confirmOverlay.className = "pb-confirm-overlay";
+    confirmOverlay.innerHTML = `
+        <div class="pb-confirm-box">
+            <p class="pb-confirm-msg" id="pb-confirm-msg"></p>
+            <div class="pb-confirm-buttons">
+                <button class="pb-confirm-btn" id="pb-confirm-cancel">Cancel</button>
+                <button class="pb-confirm-btn" id="pb-confirm-ok">OK</button>
+            </div>
+        </div>`;
+    document.body.appendChild(confirmOverlay);
 
     speakerAreaElement.addEventListener("contextmenu", onSpeakerAreaContextMenu);
     speakerAreaElement.addEventListener("mousedown",   onSpeakerDivMouseDown);
@@ -287,7 +312,7 @@ async function playBlockerPageSetup() {
 
     // Suppress the browser context menu inside the iframe; show ours instead
     contextMenuAllowed = false;
-    myIframe.contentWindow.addEventListener("contextmenu", (event) => {
+    myIframe.contentWindow.addEventListener("contextmenu", async (event) => {
         event.preventDefault();
         event.stopPropagation();
 
@@ -295,7 +320,26 @@ async function playBlockerPageSetup() {
             alert("You can only create a movement inside the text of a Speech or a StageDirection");
             return;
         }
-        startMovement(event);
+
+        // Treat this like a left-click first: snap cursor and ask about speaker repositioning
+        const iframeDoc  = myIframe.contentDocument;
+        const caretRange = iframeDoc.caretRangeFromPoint(event.clientX, event.clientY);
+        if (!caretRange) return;
+
+        snapCursorRange(caretRange);
+
+        // Compute paragraph offset BEFORE any DOM changes
+        const paragraphOffset = computeOffsetFromRange(caretRange);
+
+        const { targetPositions, targetSpanId } = findTargetPositions(iframeDoc, caretRange);
+
+        if (targetPositions && targetSpanId !== currentEffectiveSpanId(iframeDoc)) {
+            const ok = await showConfirm("Speakers will be shown as they were at this point in the script.");
+            if (!ok) return;
+        }
+
+        commitCursorMove(iframeDoc, caretRange, targetPositions);
+        startMovement(event, paragraphOffset);
     });
 
     // Change cursor when the pointer leaves the iframe during a pending movement
@@ -606,23 +650,8 @@ function restoreAtCursor() {
     const cursorRange = iframeDoc.createRange();
     cursorRange.selectNode(cursor);
 
-    let targetPositions = null;
-    let targetSpanRange = null;
+    const { targetPositions } = findTargetPositions(iframeDoc, cursorRange);
 
-    iframeDoc.querySelectorAll("span.m-normal").forEach(span => {
-        if (!movementPositions.has(span.id)) return;
-        const spanRange = iframeDoc.createRange();
-        spanRange.selectNode(span);
-        if (spanRange.compareBoundaryPoints(Range.END_TO_START, cursorRange) <= 0) {
-            if (!targetSpanRange ||
-                spanRange.compareBoundaryPoints(Range.START_TO_START, targetSpanRange) > 0) {
-                targetPositions = movementPositions.get(span.id);
-                targetSpanRange = spanRange;
-            }
-        }
-    });
-
-    // Clear any stale shadow divs and markers from a previous session
     speakerAreaElement.querySelectorAll('[id^="shadow-div-"], .movement-marker').forEach(el => el.remove());
 
     if (!targetPositions) return;
@@ -1039,6 +1068,72 @@ function iFrameOnScroll() {
         output.innerHTML = slider.value;
         dataStore.currentPage = page;
     }
+
+    const scrollY      = myIframe.contentWindow.scrollY;
+    const scrolledDown = scrollY >= lastScrollY;
+    lastScrollY        = scrollY;
+
+    clearTimeout(scrollIdleTimer);
+    scrollIdleTimer = setTimeout(() => repositionCursorIfOffScreen(scrolledDown), 250);
+}
+
+/**
+ * If the blinking cursor has scrolled out of the iframe viewport, silently moves
+ * it to a visible position (near the bottom when scrolling forward, near the top
+ * when scrolling backward) and repositions the speakers to match — no confirmation
+ * dialog is shown.
+ */
+function repositionCursorIfOffScreen(scrolledDown) {
+    if (dataStore.newMovement || dataStore.incompleteMovement || inEditMode || sliderDragging) return;
+
+    const iframeDoc    = myIframe.contentDocument;
+    const iframeWindow = myIframe.contentWindow;
+    const cursor       = iframeDoc.getElementById("script-cursor");
+    if (!cursor) return;
+
+    // getBoundingClientRect on an element inside an iframe returns coords relative
+    // to that iframe's own viewport, which is exactly what we want here.
+    const rect       = cursor.getBoundingClientRect();
+    const viewHeight = iframeWindow.innerHeight;
+    if (rect.bottom > 0 && rect.top < viewHeight) return; // still visible
+
+    const MARGIN    = 60;
+    const targetY   = scrolledDown ? viewHeight - MARGIN : MARGIN;
+    const viewWidth = iframeWindow.innerWidth;
+
+    // Scan from targetY inward (toward the centre of the viewport) until we
+    // land on a text node.  Try several x positions at each y step.
+    const step = scrolledDown ? -8 : 8;
+    let caretRange = null;
+    let y = targetY;
+
+    for (let i = 0; i < 25 && !caretRange; i++, y += step) {
+        for (const xFrac of [0.4, 0.5, 0.3, 0.6]) {
+            const r = iframeDoc.caretRangeFromPoint(viewWidth * xFrac, y);
+            if (r?.startContainer?.nodeType === Node.TEXT_NODE &&
+                r.startContainer.parentElement?.closest(".Speech, .StageDirection")) {
+                caretRange = r;
+                break;
+            }
+        }
+    }
+    if (!caretRange) {
+        // Nothing suitable in the viewport (e.g. a long opening stage direction).
+        // Fall back to just after the first movement span so speakers stay meaningful.
+        const firstSpan = iframeDoc.querySelector("span.m-normal");
+        if (!firstSpan) return; // No movements in the script — leave cursor as-is.
+
+        const fallbackRange = iframeDoc.createRange();
+        fallbackRange.setStartAfter(firstSpan);
+        fallbackRange.collapse(true);
+        const { targetPositions } = findTargetPositions(iframeDoc, fallbackRange);
+        commitCursorMove(iframeDoc, fallbackRange, targetPositions);
+        return;
+    }
+
+    snapCursorRange(caretRange);
+    const { targetPositions } = findTargetPositions(iframeDoc, caretRange);
+    commitCursorMove(iframeDoc, caretRange, targetPositions);
 }
 
 // ---------------------------------------------------------------------------
@@ -1177,16 +1272,125 @@ function handleEscapeKey() {
  *
  * @param {MouseEvent} e - The contextmenu event from inside the iframe
  */
-function startMovement(e) {
+function startMovement(e, paragraphOffset = null) {
     if (e.target.className !== "Speech" && e.target.className !== "StageDirection") {
         alert("You can only insert a movement in a speech paragraph or a stage direction.");
         return;
     }
 
-    const offset      = getClickedCharacterPosition(myIframe);
+    const offset      = paragraphOffset ?? getClickedCharacterPosition(myIframe);
     const newMovement = new Movement(myIframe, imageAreaDiv, dataStore, e.target, offset);
     dataStore.newMovement = newMovement;
     window.focus();
+}
+
+/**
+ * Shows a modal confirmation dialog and returns a Promise that resolves to
+ * true (OK) or false (Cancel).
+ */
+function showConfirm(message) {
+    return new Promise(resolve => {
+        document.getElementById("pb-confirm-msg").textContent = message;
+        document.getElementById("pb-confirm-overlay").classList.add("visible");
+
+        function done(result) {
+            document.getElementById("pb-confirm-overlay").classList.remove("visible");
+            document.getElementById("pb-confirm-ok").removeEventListener("click", okHandler);
+            document.getElementById("pb-confirm-cancel").removeEventListener("click", cancelHandler);
+            resolve(result);
+        }
+        function okHandler()     { done(true);  }
+        function cancelHandler() { done(false); }
+        document.getElementById("pb-confirm-ok").addEventListener("click", okHandler);
+        document.getElementById("pb-confirm-cancel").addEventListener("click", cancelHandler);
+    });
+}
+
+/**
+ * Finds the movement whose span is closest to but at or before `referenceRange`.
+ * Returns { targetPositions, targetSpanId } — both null when no span qualifies.
+ */
+function findTargetPositions(iframeDoc, referenceRange) {
+    let targetPositions = null;
+    let targetSpanRange = null;
+    let targetSpanId    = null;
+
+    iframeDoc.querySelectorAll("span.m-normal").forEach(span => {
+        if (!movementPositions.has(span.id)) return;
+        const spanRange = iframeDoc.createRange();
+        spanRange.selectNode(span);
+        if (spanRange.compareBoundaryPoints(Range.END_TO_START, referenceRange) <= 0) {
+            if (!targetSpanRange ||
+                spanRange.compareBoundaryPoints(Range.START_TO_START, targetSpanRange) > 0) {
+                targetPositions = movementPositions.get(span.id);
+                targetSpanRange = spanRange;
+                targetSpanId    = span.id;
+            }
+        }
+    });
+
+    return { targetPositions, targetSpanId };
+}
+
+/**
+ * Returns the id of the movement span currently in effect (the last m-normal
+ * span at or before the #script-cursor), or null if the cursor doesn't exist
+ * or no movement precedes it.
+ */
+function currentEffectiveSpanId(iframeDoc) {
+    const cursor = iframeDoc.getElementById("script-cursor");
+    if (!cursor) return null;
+    const cursorRange = iframeDoc.createRange();
+    cursorRange.selectNode(cursor);
+    return findTargetPositions(iframeDoc, cursorRange).targetSpanId;
+}
+
+/**
+ * Computes the absolute character offset within the paragraph from a Range
+ * produced by snapCursorRange (works for both text-node and after-element cases).
+ */
+function computeOffsetFromRange(range) {
+    const container = range.startContainer;
+    const offset    = range.startOffset;
+
+    if (container.nodeType === Node.TEXT_NODE) {
+        let total = offset;
+        let node  = container;
+        while (node.previousSibling) {
+            node   = node.previousSibling;
+            total += node.textContent.length;
+        }
+        return total;
+    }
+
+    if (container.nodeType === Node.ELEMENT_NODE) {
+        let total = 0;
+        for (let i = 0; i < offset; i++) {
+            total += container.childNodes[i].textContent.length;
+        }
+        return total;
+    }
+
+    return 0;
+}
+
+/**
+ * Moves the cursor span to the given range position and repositions speakers
+ * if targetPositions is non-null.  This is the commit step after any required
+ * confirmation has been obtained.
+ */
+function commitCursorMove(iframeDoc, caretRange, targetPositions) {
+    const oldCursor = iframeDoc.getElementById("script-cursor");
+    if (oldCursor) oldCursor.remove();
+    const cursor = iframeDoc.createElement("span");
+    cursor.id        = "script-cursor";
+    cursor.className = "script-cursor";
+    caretRange.insertNode(cursor);
+    isDirty = true;
+
+    speakerAreaElement.querySelectorAll('[id^="shadow-div-"], .movement-marker').forEach(el => el.remove());
+
+    if (targetPositions) restoreSpeakerPositions(targetPositions);
 }
 
 // ---------------------------------------------------------------------------
@@ -1207,15 +1411,14 @@ function attachIFrameListeners() {
         style.id = "pb-cursor-style";
         style.textContent = `
             #script-cursor {
-                display: inline;
-                color: #0066cc;
-                font-size: 1.5em;
-                font-weight: normal;
+                display: inline-block;
+                width: 0;
+                border-left: 2.5px solid #0055cc;
+                height: 1.1em;
+                vertical-align: text-bottom;
                 user-select: none;
                 pointer-events: none;
-                vertical-align: text-bottom;
-                line-height: 0;
-                animation: pb-cursor-blink 1s step-end infinite;
+                animation: pb-cursor-blink 0.7s step-end infinite;
             }
             @keyframes pb-cursor-blink { 50% { opacity: 0; } }
         `;
@@ -1250,6 +1453,46 @@ async function loadMovementPositions() {
 }
 
 /**
+ * Adjusts a Range (in-place) so that the cursor lands at the start of the
+ * clicked word rather than wherever the browser placed the caret.
+ *
+ * Rules applied in order:
+ *  1. If the caret is inside a word, walk left to the word's first character.
+ *  2. If the caret is on whitespace, walk right to the next word.
+ *  3. After snapping to word-start: if everything between the start of the
+ *     text node and the snapped offset is whitespace, AND the immediately
+ *     preceding sibling is a movement marker span, place the cursor after
+ *     that span (between the marker and the word, skipping the whitespace).
+ */
+function snapCursorRange(range) {
+    const container = range.startContainer;
+    if (container.nodeType !== Node.TEXT_NODE) return;
+
+    const text = container.data;
+    let   offset = range.startOffset;
+
+    if (offset < text.length && /\S/.test(text[offset])) {
+        // Caret is inside a word — walk left to its start
+        while (offset > 0 && /\S/.test(text[offset - 1])) offset--;
+    } else {
+        // Caret is on whitespace or at the end — walk right to the next word
+        while (offset < text.length && /\s/.test(text[offset])) offset++;
+    }
+
+    // If the only characters before the word in this text node are whitespace,
+    // and the preceding sibling is a movement marker, jump to after the marker.
+    const prev = container.previousSibling;
+    if (/^\s*$/.test(text.slice(0, offset)) &&
+        prev?.nodeType === Node.ELEMENT_NODE &&
+        (prev.classList.contains("m-normal") || prev.classList.contains("m-new"))) {
+        range.setStartAfter(prev);
+    } else {
+        range.setStart(container, offset);
+    }
+    range.collapse(true);
+}
+
+/**
  * On left-click in the script, finds the movement whose span is closest to
  * but at or before the click point, then restores all speaker divs to the
  * positions recorded when that movement was completed.
@@ -1263,45 +1506,10 @@ function onScriptClick(e) {
     const caretRange = iframeDoc.caretRangeFromPoint(e.clientX, e.clientY);
     if (!caretRange) return;
 
-    // Move the cursor marker to the click position
-    const oldCursor = iframeDoc.getElementById("script-cursor");
-    if (oldCursor) oldCursor.remove();
-    const cursor = iframeDoc.createElement("span");
-    cursor.id        = "script-cursor";
-    cursor.className = "script-cursor";
-    cursor.textContent = "|";
-    caretRange.insertNode(cursor);
-    isDirty = true;
+    snapCursorRange(caretRange);
 
-    let targetPositions = null;
-    let targetSpanRange = null;
-
-    // Use the cursor's position as the reference point so restoreAtCursor() agrees
-    const cursorRange = iframeDoc.createRange();
-    cursorRange.selectNode(cursor);
-
-    iframeDoc.querySelectorAll("span.m-normal").forEach(span => {
-        if (!movementPositions.has(span.id)) return;
-
-        const spanRange = iframeDoc.createRange();
-        spanRange.selectNode(span);
-
-        // Span must end at or before the cursor
-        if (spanRange.compareBoundaryPoints(Range.END_TO_START, cursorRange) <= 0) {
-            // Among qualifying spans, keep the one latest in document order
-            if (!targetSpanRange ||
-                spanRange.compareBoundaryPoints(Range.START_TO_START, targetSpanRange) > 0) {
-                targetPositions = movementPositions.get(span.id);
-                targetSpanRange = spanRange;
-            }
-        }
-    });
-
-    // Clear any visible shadow divs and waypoint markers left from completed movements
-    speakerAreaElement.querySelectorAll('[id^="shadow-div-"], .movement-marker').forEach(el => el.remove());
-
-    if (!targetPositions) return;
-    restoreSpeakerPositions(targetPositions);
+    const { targetPositions } = findTargetPositions(iframeDoc, caretRange);
+    commitCursorMove(iframeDoc, caretRange, targetPositions);
 }
 
 /**
@@ -1434,7 +1642,7 @@ interact(".draggable").draggable({
             if (event.target.id.startsWith("speaker-div-")) {
                 const initials = event.target.id.split("-").pop();
                 const speaker  = speakers.find(s => s.speakerInitials === initials);
-                if (speaker?.onImage) {
+                if (speaker?.onImage && !dataStore.newMovement) {
                     isDragging = false;
                     event.interaction.stop();
                     return;
@@ -1647,6 +1855,9 @@ interact(".stage-image").dropzone({
             }
             dataStore.incompleteMovement = null;
             isDirty = true;
+
+            // Remove the shadow and waypoint markers now that the movement is saved
+            speakerAreaElement.querySelectorAll('[id^="shadow-div-"], .movement-marker').forEach(el => el.remove());
         }
         if (dataStore.newMovement) {
             dataStore.newMovement = null;
@@ -1666,7 +1877,7 @@ interact(".dropzone").dropzone({ accept: ".draggable" });
 // ---------------------------------------------------------------------------
 
 function onSpeakerDivMouseDown(e) {
-    if (e.button !== 0 || inEditMode) return;
+    if (e.button !== 0 || inEditMode || dataStore.newMovement) return;
     const target = e.target.closest('[id^="speaker-div-"]');
     if (!target) return;
     const initials = target.id.replace("speaker-div-", "");
@@ -1759,7 +1970,7 @@ function hideMovementPeek() {
  */
 function blockOutsideEditArtifacts(e) {
     if (!inEditMode) return;
-    if (e.target.closest(".edit-artifact, #pb-context-menu")) return;
+    if (e.target.closest(".edit-artifact, #pb-context-menu, #pb-confirm-overlay")) return;
     e.preventDefault();
     e.stopPropagation();
 }

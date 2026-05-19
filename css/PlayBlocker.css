@@ -199,3 +199,43 @@ iframe {
 .pb-context-menu-item:hover {
   background: #e8f0fe;
 }
+
+.pb-confirm-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0,0,0,0.35);
+  align-items: center;
+  justify-content: center;
+}
+.pb-confirm-overlay.visible {
+  display: flex;
+}
+.pb-confirm-box {
+  background: #fff;
+  border-radius: 6px;
+  padding: 20px 24px 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  max-width: 380px;
+  font-family: sans-serif;
+  font-size: 14px;
+}
+.pb-confirm-msg {
+  margin: 0 0 16px;
+  line-height: 1.4;
+}
+.pb-confirm-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.pb-confirm-btn {
+  padding: 5px 14px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px;
+}
+#pb-confirm-ok     { background: #007bff; color: white; }
+#pb-confirm-cancel { background: #d0d0d0; color: #333; }
