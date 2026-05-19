@@ -295,25 +295,6 @@ function waitForIframe() {
 }
 
 /**
- * Positions all speakers that have a saved RP onto the stage image.
- * Called once after the production's stage image has finished loading.
- */
-function placeSavedSpeakersOnStage() {
-    const imgRect  = stageImageElement.getBoundingClientRect();
-    const areaRect = speakerAreaElement.getBoundingClientRect();
-
-    speakers.forEach(speaker => {
-        if (!speaker.RP) return;
-        speaker.onImage = true;
-        const x = speaker.RP.rX * imgRect.width  + (imgRect.left - areaRect.left) - 15;
-        const y = speaker.RP.rY * imgRect.height + (imgRect.top  - areaRect.top)  - 15;
-        speaker.speakerDiv.style.transform = `translate(${x}px, ${y}px)`;
-        speaker.speakerDiv.setAttribute("data-x", x);
-        speaker.speakerDiv.setAttribute("data-y", y);
-    });
-}
-
-/**
  * Fetches the current production's stage image and script body from the API
  * and loads them into the page, exactly as if the user had uploaded both files.
  */
@@ -341,9 +322,6 @@ async function loadProductionData() {
             stageImageElement.src = production.stage_image;
         });
     }
-
-    // Place any speakers that have saved stage positions
-    placeSavedSpeakersOnStage();
 
     // ---- Script ----
     if (production.script_body) {
