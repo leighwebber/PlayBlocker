@@ -335,6 +335,27 @@ async function loadProductionData() {
     if (production.script_body) {
         await waitForIframe();
         myIframe.contentDocument.body.innerHTML = production.script_body;
+
+        // The saved script contains spans like <span id="m-3">.  The Movement
+        // constructor assigns ids as "m-" + mList.count(), which resets to 1 on
+        // every page load.  Without this fix, the first new movement would get
+        // id "m-1" — but getElementById("m-1") then finds the OLD span from the
+        // saved script instead of the newly inserted [?] span, so the speaker
+        // setter updates the wrong element and the initials never appear.
+        //
+        // Advance the movementList past the highest existing id so new movements
+        // always get a never-before-seen id.  The sentinel objects are safe
+        // to add because every forEach loop guards with !movement.speakerDiv.
+        const sentinel = { shadowDiv: null, shadowRP: null, speakerDiv: null };
+        let maxMovementId = 0;
+        myIframe.contentDocument.querySelectorAll("span.m-normal").forEach(span => {
+            const n = parseInt(span.id.replace("m-", ""), 10);
+            if (!isNaN(n) && n > maxMovementId) maxMovementId = n;
+        });
+        while (dataStore.movementList.count() < maxMovementId) {
+            dataStore.movementList.add(dataStore.movementList.count(), sentinel);
+        }
+
         attachIFrameListeners();
         await loadMovementPositions();
         restoreAtCursor();
