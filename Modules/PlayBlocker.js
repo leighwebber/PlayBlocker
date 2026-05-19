@@ -23,6 +23,7 @@ import {
     MovementList, getMovementListLog,
     createRP,
     speakerObjFromSpeakerDiv,
+    redrawChain,
 } from "../Modules/Backend.js";
 
 import {
@@ -42,6 +43,7 @@ import {
     saveMovement,
     fetchMovements,
     fetchProduction,
+    updateMovement,
 } from "../Modules/Database.js";
 
 // ---------------------------------------------------------------------------
@@ -80,6 +82,20 @@ const movementPositions = new Map();
 
 /** Maps span id → { paraIndex, textOffset, moverInitials } for span reconstruction on load. */
 const movementAnchorData = new Map();
+
+/** Full movement data for editing: spanId → { dbId, moverInitials, shadowRP, endRP, waypoints, speakerPositions } */
+const completedMovements = new Map();
+
+/** True while the user is in movement-edit mode. */
+let inEditMode = false;
+
+/**
+ * Active edit session state, null when not editing.
+ * @type {{ spanId, dbId, speakerInitials, originalShadowRP, originalEndRP, originalWaypoints,
+ *          currentShadowRP, currentEndRP, currentWaypoints,
+ *          shadowDiv, markerDivs, shadowMoved, endMoved } | null}
+ */
+let editState = null;
 
 /** The speaker panel container element. */
 let speakerAreaElement = null;
@@ -240,6 +256,15 @@ async function playBlockerPageSetup() {
 
     // Download button
     document.getElementById("saveScript").addEventListener("click", saveProductionState);
+
+    // Context menu for speaker/edit artifacts
+    const menuEl = document.createElement("div");
+    menuEl.id        = "pb-context-menu";
+    menuEl.className = "pb-context-menu";
+    document.body.appendChild(menuEl);
+    document.addEventListener("click", () => hideContextMenu());
+
+    speakerAreaElement.addEventListener("contextmenu", onSpeakerAreaContextMenu);
 
     // Populate speaker icons in the speaker panel
     await insertSpeakers(speakerAreaElement);
@@ -1195,9 +1220,19 @@ function attachIFrameListeners() {
 async function loadMovementPositions() {
     try {
         const movements = await fetchMovements(dataStore.productionId);
-        movements.forEach(({ markerId, paraIndex, textOffset, moverInitials, speakerPositions }) => {
-            movementPositions.set(`m-${markerId}`, speakerPositions);
-            movementAnchorData.set(`m-${markerId}`, { paraIndex, textOffset, moverInitials });
+        movements.forEach(({ markerId, id, paraIndex, textOffset, moverInitials,
+                             shadowRpX, shadowRpY, endRpX, endRpY, waypoints, speakerPositions }) => {
+            const spanId = `m-${markerId}`;
+            movementPositions.set(spanId, speakerPositions);
+            movementAnchorData.set(spanId, { paraIndex, textOffset, moverInitials });
+            completedMovements.set(spanId, {
+                dbId:            id,
+                moverInitials,
+                shadowRP:        shadowRpX != null ? { rX: shadowRpX, rY: shadowRpY } : null,
+                endRP:           endRpX    != null ? { rX: endRpX,    rY: endRpY    } : null,
+                waypoints:       waypoints || [],
+                speakerPositions,
+            });
         });
     } catch (err) {
         console.error("loadMovementPositions failed:", err);
@@ -1373,6 +1408,29 @@ interact(".draggable").draggable({
             // Store the pre-drag transform so we can restore it if the drop is invalid
             event.target.originalTransform = event.target.style.transform;
 
+            if (inEditMode) {
+                // Only the edit-shadow and the speaker being edited may be dragged.
+                // All other draggables (other speakers, normal shadows) are blocked.
+                const id = event.target.id;
+                if (!id.startsWith("edit-shadow-div-") && !id.startsWith("speaker-div-")) {
+                    isDragging = false;
+                    event.interaction.stop();
+                }
+                return;
+            }
+
+            // Outside edit mode: block dragging a speaker that is already on stage.
+            // They can only be moved through the edit-mode workflow.
+            if (event.target.id.startsWith("speaker-div-")) {
+                const initials = event.target.id.split("-").pop();
+                const speaker  = speakers.find(s => s.speakerInitials === initials);
+                if (speaker?.onImage) {
+                    isDragging = false;
+                    event.interaction.stop();
+                    return;
+                }
+            }
+
             if (dataStore.newMovement) {
                 // The user right-clicked first (creating a pending movement), then
                 // started dragging a speaker icon.  We now know which speaker is moving.
@@ -1443,7 +1501,9 @@ interact(".draggable").draggable({
             target.style.zIndex = 1000; // Appear on top during drag
 
             // Redraw the connector line while dragging
-            if (dataStore.incompleteMovement) {
+            if (inEditMode) {
+                redrawEditLines();
+            } else if (dataStore.incompleteMovement) {
                 dataStore.incompleteMovement.drawLines();
             }
 
@@ -1462,6 +1522,15 @@ interact(".draggable").draggable({
          */
         end(event) {
             isDragging = false;
+
+            if (inEditMode) {
+                // Edit-shadow dragged freely — record its new RP (speakerDiv drop handled by ondrop)
+                if (event.target.id.startsWith("edit-shadow-div-")) {
+                    editState.currentShadowRP = rpFromEditDiv(event.target, 15);
+                    editState.shadowMoved = true;
+                }
+                return;
+            }
 
             if (event.target.onImage) {
                 // Dropped successfully on stage — leave it where it landed
@@ -1499,7 +1568,23 @@ interact(".stage-image").dropzone({
     },
 
     async ondrop(event) {
-        wasDroppedInImageArea       = true;
+        wasDroppedInImageArea = true;
+
+        if (inEditMode) {
+            // Edit-shadow dropped on image — position already tracked in drag end handler
+            if (event.relatedTarget.id.startsWith("edit-shadow-div-")) return;
+
+            // Speaker dropped on image in edit mode — record new end position
+            const rp = createRP(event.dragEvent.clientX, event.dragEvent.clientY, stageImageElement, imageAreaDiv);
+            speakerObjFromSpeakerDiv(event.relatedTarget).RP = rp;
+            editState.currentEndRP = { rX: rp.rX, rY: rp.rY };
+            editState.endMoved     = true;
+            document.body.style.cursor                 = "default";
+            myIframe.contentDocument.body.style.cursor = "text";
+            redrawEditLines();
+            return;
+        }
+
         event.relatedTarget.onImage = true;
 
         // Compute proportional position on the stage image
@@ -1565,3 +1650,381 @@ interact(".stage-image").dropzone({
 
 // Ensure the dropzone also accepts .draggable elements (belt-and-suspenders)
 interact(".dropzone").dropzone({ accept: ".draggable" });
+
+// ---------------------------------------------------------------------------
+// Context menu
+// ---------------------------------------------------------------------------
+
+function showContextMenu(x, y, items) {
+    const menu = document.getElementById("pb-context-menu");
+    menu.innerHTML = "";
+    items.forEach(({ label, action }) => {
+        const item = document.createElement("div");
+        item.className   = "pb-context-menu-item";
+        item.textContent = label;
+        item.addEventListener("click", (e) => {
+            e.stopPropagation();
+            hideContextMenu();
+            action();
+        });
+        menu.appendChild(item);
+    });
+    menu.style.left    = `${x}px`;
+    menu.style.top     = `${y}px`;
+    menu.style.display = "block";
+}
+
+function hideContextMenu() {
+    const menu = document.getElementById("pb-context-menu");
+    if (menu) menu.style.display = "none";
+}
+
+/**
+ * Right-click handler for the image area.
+ * Shows "Edit" for a speaker div (outside edit mode) and "Save / Cancel"
+ * for any edit artifact (inside edit mode).
+ */
+function onSpeakerAreaContextMenu(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    hideContextMenu();
+
+    if (dataStore.newMovement || dataStore.incompleteMovement) return;
+
+    const target = e.target.closest(
+        '[id^="speaker-div-"],[id^="edit-shadow-div-"],[id^="shadow-div-"],[id^="movement-marker-"]'
+    );
+    if (!target) return;
+
+    if (inEditMode) {
+        showContextMenu(e.clientX, e.clientY, [
+            { label: "Save",   action: () => saveEdit() },
+            { label: "Cancel", action: () => cancelEdit() },
+        ]);
+        return;
+    }
+
+    if (!target.id.startsWith("speaker-div-")) return;
+    const initials = target.id.replace("speaker-div-", "");
+    const speaker  = speakers.find(s => s.speakerInitials === initials);
+    if (!speaker?.onImage) return;
+
+    showContextMenu(e.clientX, e.clientY, [
+        { label: `Edit ${speaker.speakerFirstName}'s movement`, action: () => enterEditMode(speaker) },
+    ]);
+}
+
+// ---------------------------------------------------------------------------
+// Edit mode — enter / exit
+// ---------------------------------------------------------------------------
+
+/**
+ * Converts a div's current data-x / data-y pixel attributes to a proportional
+ * RP coordinate on the stage image.  `halfPx` is half the div's rendered size
+ * (15 for 30 px speaker/shadow divs, 5 for 10 px marker divs).
+ */
+function rpFromEditDiv(div, halfPx) {
+    const x = parseFloat(div.getAttribute("data-x")) || 0;
+    const y = parseFloat(div.getAttribute("data-y")) || 0;
+    const imgRect  = stageImageElement.getBoundingClientRect();
+    const areaRect = speakerAreaElement.getBoundingClientRect();
+    const imgOffsetLeft = imgRect.left - areaRect.left;
+    const imgOffsetTop  = imgRect.top  - areaRect.top;
+    return createRP(x + halfPx - imgOffsetLeft, y + halfPx - imgOffsetTop, stageImageElement);
+}
+
+/**
+ * Redraws the connector chain for the movement currently being edited.
+ * Chain order: editShadow → waypoint[0] → … → speakerDiv.
+ */
+function redrawEditLines() {
+    if (!editState) return;
+    const speaker    = speakers.find(s => s.speakerInitials === editState.speakerInitials);
+    if (!speaker) return;
+    const chain = [editState.shadowDiv, ...editState.markerDivs, speaker.speakerDiv];
+    redrawChain(chain);
+}
+
+/**
+ * Enters edit mode for the last movement belonging to `speaker` before the cursor.
+ * Reconstructs the shadow div and waypoints, makes them draggable, and draws lines.
+ */
+function enterEditMode(speaker) {
+    if (inEditMode) return;
+
+    const iframeDoc = myIframe.contentDocument;
+    const cursor    = iframeDoc.getElementById("script-cursor");
+    if (!cursor) {
+        alert("Click in the script first to set the cursor position.");
+        return;
+    }
+
+    // Find the last movement span for this speaker that precedes the cursor
+    const cursorRange = iframeDoc.createRange();
+    cursorRange.selectNode(cursor);
+
+    let editSpanId    = null;
+    let editSpanRange = null;
+
+    iframeDoc.querySelectorAll("span.m-normal").forEach(span => {
+        const anchor = movementAnchorData.get(span.id);
+        if (anchor?.moverInitials !== speaker.speakerInitials) return;
+
+        const spanRange = iframeDoc.createRange();
+        spanRange.selectNode(span);
+        if (spanRange.compareBoundaryPoints(Range.END_TO_START, cursorRange) > 0) return;
+
+        if (!editSpanRange || spanRange.compareBoundaryPoints(Range.START_TO_START, editSpanRange) > 0) {
+            editSpanId    = span.id;
+            editSpanRange = spanRange;
+        }
+    });
+
+    if (!editSpanId) {
+        alert(`No movement found for ${speaker.speakerFirstName} before the cursor.`);
+        return;
+    }
+
+    const movData = completedMovements.get(editSpanId);
+    if (!movData?.shadowRP || !movData?.endRP) {
+        alert("Movement data is incomplete — cannot edit.");
+        return;
+    }
+
+    inEditMode = true;
+    editState  = {
+        spanId:             editSpanId,
+        dbId:               movData.dbId,
+        speakerInitials:    speaker.speakerInitials,
+        originalShadowRP:   { ...movData.shadowRP },
+        originalEndRP:      { ...movData.endRP },
+        originalWaypoints:  movData.waypoints.map(wp => ({ ...wp })),
+        currentShadowRP:    { ...movData.shadowRP },
+        currentEndRP:       { ...movData.endRP },
+        currentWaypoints:   movData.waypoints.map(wp => ({ ...wp })),
+        shadowDiv:          null,
+        markerDivs:         [],
+        shadowMoved:        false,
+        endMoved:           false,
+    };
+
+    const imgRect  = stageImageElement.getBoundingClientRect();
+    const areaRect = speakerAreaElement.getBoundingClientRect();
+
+    // Create the edit shadow div (paler, same as a normal shadow)
+    const shadowX = movData.shadowRP.rX * imgRect.width  + (imgRect.left - areaRect.left) - 15;
+    const shadowY = movData.shadowRP.rY * imgRect.height + (imgRect.top  - areaRect.top)  - 15;
+    const editShadow = createSpeakerDiv(dataStore, speaker,
+        { currentX: shadowX, currentY: shadowY, yIncrement: 0, bottomOfColumnY: 0, topOfColumnY: 0 },
+        true /* isShadow */
+    );
+    editShadow.id            = `edit-shadow-div-${speaker.speakerInitials}`;
+    editShadow.style.zIndex  = "100";
+    editShadow.style.pointerEvents = "auto";
+    speakerAreaElement.appendChild(editShadow);
+    editState.shadowDiv = editShadow;
+
+    // Create waypoint markers
+    movData.waypoints.forEach((wp, i) => {
+        const markerX = wp.rX * imgRect.width  + (imgRect.left - areaRect.left) - 5;
+        const markerY = wp.rY * imgRect.height + (imgRect.top  - areaRect.top)  - 5;
+        const markerDiv = createMovementMarkerDiv(markerX, markerY, speaker.backgroundColor, markerCount++);
+        markerDiv.style.pointerEvents = "auto";
+        markerDiv._rp = { rX: wp.rX, rY: wp.rY };
+        speakerAreaElement.appendChild(markerDiv);
+        editState.markerDivs.push(markerDiv);
+
+        // Make each waypoint draggable
+        const idx = i;
+        interact(markerDiv).draggable({
+            modifiers: [interact.modifiers.restrictRect({ restriction: "#image-area", endOnly: false })],
+            listeners: {
+                move(ev) {
+                    const mx = (parseFloat(ev.target.getAttribute("data-x")) || 0) + ev.dx;
+                    const my = (parseFloat(ev.target.getAttribute("data-y")) || 0) + ev.dy;
+                    ev.target.style.transform = `translate(${mx}px, ${my}px)`;
+                    ev.target.setAttribute("data-x", mx);
+                    ev.target.setAttribute("data-y", my);
+                    redrawEditLines();
+                },
+                end(ev) {
+                    editState.currentWaypoints[idx] = rpFromEditDiv(ev.target, 5);
+                },
+            },
+        });
+    });
+
+    // Draw the full connector chain
+    redrawEditLines();
+}
+
+/**
+ * Saves the edited movement to the server and cascades changes to adjacent
+ * movements for the same speaker.
+ */
+async function saveEdit() {
+    if (!editState) return;
+    hideContextMenu();
+
+    const { spanId, dbId, speakerInitials,
+            currentShadowRP, currentEndRP, currentWaypoints,
+            shadowMoved, endMoved } = editState;
+    const speaker = speakers.find(s => s.speakerInitials === speakerInitials);
+
+    // --- Build updated speakerPositions for the edited movement ---
+    const editedPositions = (movementPositions.get(spanId) || []).map(sp =>
+        sp.initials === speakerInitials
+            ? { ...sp, rX: currentEndRP.rX, rY: currentEndRP.rY }
+            : { ...sp }
+    );
+
+    try {
+        await updateMovement(dbId, {
+            shadowRpX:        currentShadowRP.rX,
+            shadowRpY:        currentShadowRP.rY,
+            endRpX:           currentEndRP.rX,
+            endRpY:           currentEndRP.rY,
+            waypoints:        currentWaypoints.map((wp, i) => ({ sequence: i, rX: wp.rX, rY: wp.rY })),
+            speakerPositions: editedPositions.map(sp => ({
+                speakerId: speakers.find(x => x.speakerInitials === sp.initials)?.dbId,
+                rX: sp.rX, rY: sp.rY,
+            })),
+        });
+    } catch (err) {
+        console.error("saveEdit: updateMovement failed:", err);
+        alert("Failed to save movement. Please try again.");
+        return;
+    }
+
+    // Update in-memory maps for the edited movement
+    movementPositions.set(spanId, editedPositions);
+    completedMovements.set(spanId, {
+        ...completedMovements.get(spanId),
+        shadowRP:        currentShadowRP,
+        endRP:           currentEndRP,
+        waypoints:       currentWaypoints,
+        speakerPositions: editedPositions,
+    });
+
+    // Locate this speaker's movements in document order
+    const iframeDoc  = myIframe.contentDocument;
+    const allSpans   = Array.from(iframeDoc.querySelectorAll("span.m-normal"));
+    const speakerSpans = allSpans.filter(sp =>
+        movementAnchorData.get(sp.id)?.moverInitials === speakerInitials
+    );
+    const editIdx = speakerSpans.findIndex(sp => sp.id === spanId);
+
+    // --- Cascade forward: speakerDiv moved → update next movement's shadowRP ---
+    if (endMoved && editIdx >= 0 && editIdx < speakerSpans.length - 1) {
+        const nextSpan = speakerSpans[editIdx + 1];
+        const nextData = completedMovements.get(nextSpan.id);
+        if (nextData) {
+            try { await updateMovement(nextData.dbId, { shadowRpX: currentEndRP.rX, shadowRpY: currentEndRP.rY }); }
+            catch (err) { console.error("saveEdit: next shadowRP update failed:", err); }
+            completedMovements.set(nextSpan.id, { ...nextData, shadowRP: { ...currentEndRP } });
+        }
+        // Update speaker's position in all snapshots between spanId and nextSpan
+        const editGlobalIdx = allSpans.indexOf(speakerSpans[editIdx]);
+        const nextGlobalIdx = allSpans.indexOf(nextSpan);
+        for (let i = editGlobalIdx + 1; i < nextGlobalIdx; i++) {
+            await updateSpeakerInSnapshot(allSpans[i].id, speakerInitials, currentEndRP);
+        }
+    }
+
+    // --- Cascade backward: shadowDiv moved → update prev movement's endRP ---
+    if (shadowMoved && editIdx > 0) {
+        const prevSpan = speakerSpans[editIdx - 1];
+        const prevData = completedMovements.get(prevSpan.id);
+        if (prevData) {
+            const prevPositions = (movementPositions.get(prevSpan.id) || []).map(sp =>
+                sp.initials === speakerInitials
+                    ? { ...sp, rX: currentShadowRP.rX, rY: currentShadowRP.rY }
+                    : { ...sp }
+            );
+            try {
+                await updateMovement(prevData.dbId, {
+                    endRpX: currentShadowRP.rX, endRpY: currentShadowRP.rY,
+                    speakerPositions: prevPositions.map(sp => ({
+                        speakerId: speakers.find(x => x.speakerInitials === sp.initials)?.dbId,
+                        rX: sp.rX, rY: sp.rY,
+                    })),
+                });
+            } catch (err) { console.error("saveEdit: prev endRP update failed:", err); }
+            movementPositions.set(prevSpan.id, prevPositions);
+            completedMovements.set(prevSpan.id, { ...prevData, endRP: { ...currentShadowRP }, speakerPositions: prevPositions });
+
+            // Update speaker's position in snapshots between prevSpan and spanId
+            const prevGlobalIdx = allSpans.indexOf(prevSpan);
+            const editGlobalIdx = allSpans.indexOf(speakerSpans[editIdx]);
+            for (let i = prevGlobalIdx + 1; i < editGlobalIdx; i++) {
+                await updateSpeakerInSnapshot(allSpans[i].id, speakerInitials, currentShadowRP);
+            }
+        }
+    }
+
+    // Update speaker's RP to its new end position
+    if (speaker && endMoved) speaker.RP = createRP(currentEndRP.rX, currentEndRP.rY);
+
+    cleanupEditMode();
+    isDirty = true;
+}
+
+/**
+ * Cancels the current edit and restores everything to the original positions.
+ */
+function cancelEdit() {
+    if (!editState) return;
+    hideContextMenu();
+
+    const speaker = speakers.find(s => s.speakerInitials === editState.speakerInitials);
+    if (speaker) {
+        // Restore speaker to its original end position
+        const { rX, rY } = editState.originalEndRP;
+        speaker.RP = createRP(rX, rY);
+        const imgRect  = stageImageElement.getBoundingClientRect();
+        const areaRect = speakerAreaElement.getBoundingClientRect();
+        const x = rX * imgRect.width  + (imgRect.left - areaRect.left) - 15;
+        const y = rY * imgRect.height + (imgRect.top  - areaRect.top)  - 15;
+        const div = speaker.speakerDiv;
+        div.style.transform = `translate(${x}px, ${y}px)`;
+        div.setAttribute("data-x", x);
+        div.setAttribute("data-y", y);
+    }
+
+    cleanupEditMode();
+}
+
+/** Tears down all edit-mode DOM elements and resets state flags. */
+function cleanupEditMode() {
+    if (!editState) return;
+    editState.markerDivs.forEach(div => { interact(div).unset(); div.remove(); });
+    editState.shadowDiv?.remove();
+    editState = null;
+    inEditMode = false;
+}
+
+/**
+ * Updates a single speaker's position in a movement's speakerPositions snapshot,
+ * both in memory and in the database.
+ */
+async function updateSpeakerInSnapshot(spanId, speakerInitials, newRP) {
+    const movData   = completedMovements.get(spanId);
+    const positions = movementPositions.get(spanId);
+    if (!movData || !positions) return;
+
+    const updated = positions.map(sp =>
+        sp.initials === speakerInitials ? { ...sp, rX: newRP.rX, rY: newRP.rY } : { ...sp }
+    );
+    try {
+        await updateMovement(movData.dbId, {
+            speakerPositions: updated.map(sp => ({
+                speakerId: speakers.find(x => x.speakerInitials === sp.initials)?.dbId,
+                rX: sp.rX, rY: sp.rY,
+            })),
+        });
+        movementPositions.set(spanId, updated);
+        completedMovements.set(spanId, { ...movData, speakerPositions: updated });
+    } catch (err) {
+        console.error(`updateSpeakerInSnapshot(${spanId}) failed:`, err);
+    }
+}

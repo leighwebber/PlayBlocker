@@ -446,6 +446,17 @@ function drawLine(fromDiv, toDiv) {
     fromDiv.querySelector("svg").appendChild(createPath(fromGeo.cx, fromGeo.cy, x2, y2));
 }
 
+/**
+ * Erases existing connector lines from each div in the chain, then redraws
+ * each segment from left to right.
+ *
+ * @param {HTMLElement[]} divs - Ordered array: [shadowDiv, ...markers, speakerDiv]
+ */
+export function redrawChain(divs) {
+    divs.forEach(div => eraseLine(div));
+    divs.slice(0, -1).forEach((div, i) => drawLine(div, divs[i + 1]));
+}
+
 // ---------------------------------------------------------------------------
 // Movement marker
 // ---------------------------------------------------------------------------

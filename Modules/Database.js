@@ -151,6 +151,31 @@ export async function fetchProduction(productionId) {
 }
 
 // ---------------------------------------------------------------------------
+// Movements — updateMovement
+// ---------------------------------------------------------------------------
+
+/**
+ * Partially updates a completed movement's shadow, end, waypoints, and/or
+ * speaker-position snapshot.  Only the fields present in `data` are sent.
+ *
+ * @param {number} movementId
+ * @param {{ shadowRpX?, shadowRpY?, endRpX?, endRpY?,
+ *           waypoints?, speakerPositions? }} data
+ * @returns {Promise<void>}
+ */
+export async function updateMovement(movementId, data) {
+    const response = await fetch(`${API_URL}/movements/${movementId}`, {
+        method:      "PUT",
+        credentials: "include",
+        headers:     { "Content-Type": "application/json" },
+        body:        JSON.stringify(data),
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to update movement: ${response.statusText}`);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Movements — fetchMovements
 // ---------------------------------------------------------------------------
 

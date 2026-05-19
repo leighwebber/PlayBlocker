@@ -174,3 +174,28 @@ iframe {
   pointer-events: none;
   z-index: 200;
 }
+
+.pb-context-menu {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  background: #fff;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  box-shadow: 2px 4px 10px rgba(0,0,0,0.2);
+  padding: 4px 0;
+  min-width: 160px;
+  font-family: sans-serif;
+  font-size: 13px;
+}
+
+.pb-context-menu-item {
+  padding: 7px 16px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.pb-context-menu-item:hover {
+  background: #e8f0fe;
+}
