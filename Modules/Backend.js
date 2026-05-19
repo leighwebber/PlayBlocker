@@ -589,6 +589,9 @@ export class Movement {
      */
     movementMarkers = [];
 
+    /** Snapshot of all speaker RPs at the moment this movement's drop completes. */
+    speakerPositions = null;
+
     /**
      * @param {HTMLIFrameElement} iFrame
      * @param {HTMLElement}       imageAreaDiv      - The div wrapping the stage image

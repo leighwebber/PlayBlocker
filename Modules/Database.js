@@ -37,8 +37,8 @@ export async function saveScript() {
  * @returns {Promise<Array<{id:number, name:string, initials:string,
  *                          color:string, rpX:number|null, rpY:number|null}>>}
  */
-export async function fetchSpeakers() {
-    const response = await fetch(`${API_URL}/speakers`, {
+export async function fetchSpeakers(productionId) {
+    const response = await fetch(`${API_URL}/speakers?productionId=${productionId}`, {
         method:      "GET",
         credentials: "include",
         headers:     { "Accept": "application/json" },
@@ -107,7 +107,7 @@ export async function saveSpeakers(speakers) {
  * @param {number} speakerDbId  - The speakers.id PK for the moving speaker
  * @returns {Promise<void>}
  */
-export async function saveMovement(movement, speakerDbId) {
+export async function saveMovement(movement, speakerDbId, productionId) {
     // Extract the numeric index from the movement's span id, e.g. "m-3" → 3
     const markerId = parseInt(movement.node?.id?.split("-").pop(), 10);
 
@@ -117,14 +117,22 @@ export async function saveMovement(movement, speakerDbId) {
         rpY:      markerDiv._rp?.rY ?? null,
     }));
 
+    const speakerPositions = (movement.speakerPositions ?? []).map(sp => ({
+        speakerId: sp.speakerId,
+        rX:        sp.rX,
+        rY:        sp.rY,
+    }));
+
     const payload = {
-        speakerId:    speakerDbId,
+        speakerId:       speakerDbId,
         markerId,
-        shadowRpX:    movement.shadowRP?.rX ?? null,
-        shadowRpY:    movement.shadowRP?.rY ?? null,
-        endRpX:       movement.speaker?.RP?.rX ?? null,
-        endRpY:       movement.speaker?.RP?.rY ?? null,
+        shadowRpX:       movement.shadowRP?.rX ?? null,
+        shadowRpY:       movement.shadowRP?.rY ?? null,
+        endRpX:          movement.speaker?.RP?.rX ?? null,
+        endRpY:          movement.speaker?.RP?.rY ?? null,
         waypoints,
+        speakerPositions,
+        productionId,
     };
 
     const response = await fetch(`${API_URL}/movements`, {
@@ -137,4 +145,30 @@ export async function saveMovement(movement, speakerDbId) {
     if (!response.ok) {
         throw new Error(`Failed to save movement: ${response.statusText}`);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Movements — fetchMovements
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetches all persisted movements with their speaker-position snapshots.
+ *
+ * Returns an array of { markerId, speakerPositions } objects, where
+ * speakerPositions is [{ initials, rX, rY }, …].
+ *
+ * @returns {Promise<Array<{markerId: number, speakerPositions: Array}>>}
+ */
+export async function fetchMovements(productionId) {
+    const response = await fetch(`${API_URL}/movements?productionId=${productionId}`, {
+        method:      "GET",
+        credentials: "include",
+        headers:     { "Accept": "application/json" },
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to fetch movements: ${response.statusText}`);
+    }
+
+    return await response.json();
 }

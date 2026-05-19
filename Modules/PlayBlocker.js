@@ -41,6 +41,7 @@ import {
     fetchSpeakers,
     saveSpeakers,
     saveMovement,
+    fetchMovements,
 } from "../Modules/Database.js";
 
 // ---------------------------------------------------------------------------
@@ -70,6 +71,9 @@ let wasDroppedInImageArea = false;
 
 /** Bounding rect of the stage image — cached and updated on resize. */
 let stageImageRect = null;
+
+/** Maps span id (e.g. "m-3") → speakerPositions snapshot for click-to-restore. */
+const movementPositions = new Map();
 
 /** The speaker panel container element. */
 let speakerAreaElement = null;
@@ -312,7 +316,7 @@ async function insertSpeakers(speakerContainer) {
     // Try to load speakers from the server; fall back to the static list on any error
     let serverRows = [];
     try {
-        serverRows = await fetchSpeakers();
+        serverRows = await fetchSpeakers(dataStore.productionId);
     } catch (err) {
         console.warn("fetchSpeakers failed — using hard-coded fallback cast.", err);
     }
@@ -636,6 +640,9 @@ function handleFileSelection(event) {
         // Re-attach click handlers (they are lost when the body is replaced)
         attachIFrameListeners();
 
+        // Reload persisted movement positions so click-to-restore works after a page reload
+        loadMovementPositions();
+
         // Update state
         dataStore.script.fileName    = file.name;
         dataStore.script.htmlContent = myIframe.contentDocument.body.innerHTML;
@@ -893,14 +900,87 @@ function attachIFrameListeners() {
 }
 
 /**
- * Logs the clicked character position — used during development to verify
- * that the offset calculation is correct.
+ * Fetches all persisted movements from the server and populates movementPositions
+ * so that click-to-restore works after a page reload.
+ */
+async function loadMovementPositions() {
+    try {
+        const movements = await fetchMovements(dataStore.productionId);
+        movements.forEach(({ markerId, speakerPositions }) => {
+            movementPositions.set(`m-${markerId}`, speakerPositions);
+        });
+    } catch (err) {
+        console.error("loadMovementPositions failed:", err);
+    }
+}
+
+/**
+ * On left-click in the script, finds the movement whose span is closest to
+ * but at or before the click point, then restores all speaker divs to the
+ * positions recorded when that movement was completed.
  *
  * @param {MouseEvent} e
  */
 function onScriptClick(e) {
-    const x = getClickedCharacterPosition(myIframe);
-    console.log("Clicked at character offset:", x);
+    if (dataStore.newMovement || dataStore.incompleteMovement) return;
+
+    const iframeDoc  = myIframe.contentDocument;
+    const caretRange = iframeDoc.caretRangeFromPoint(e.clientX, e.clientY);
+    if (!caretRange) return;
+
+    let targetPositions = null;
+    let targetSpanRange = null;
+
+    iframeDoc.querySelectorAll("span.m-normal").forEach(span => {
+        if (!movementPositions.has(span.id)) return;
+
+        const spanRange = iframeDoc.createRange();
+        spanRange.selectNode(span);
+
+        // Span must end at or before the caret
+        if (spanRange.compareBoundaryPoints(Range.END_TO_START, caretRange) <= 0) {
+            // Among qualifying spans, keep the one latest in document order
+            if (!targetSpanRange ||
+                spanRange.compareBoundaryPoints(Range.START_TO_START, targetSpanRange) > 0) {
+                targetPositions = movementPositions.get(span.id);
+                targetSpanRange = spanRange;
+            }
+        }
+    });
+
+    // Clear any visible shadow divs and waypoint markers left from completed movements
+    speakerAreaElement.querySelectorAll('[id^="shadow-div-"], .movement-marker').forEach(el => el.remove());
+
+    if (!targetPositions) return;
+    restoreSpeakerPositions(targetPositions);
+}
+
+/**
+ * Moves every speaker div to the position recorded in a speakerPositions snapshot.
+ *
+ * @param {Array<{initials: string, rX: number, rY: number}>} speakerPositions
+ */
+function restoreSpeakerPositions(speakerPositions) {
+    const imgRect  = stageImageElement.getBoundingClientRect();
+    const areaRect = speakerAreaElement.getBoundingClientRect();
+
+    speakerPositions.forEach(({ initials, rX, rY }) => {
+        const speaker = speakers.find(s => s.speakerInitials === initials);
+        if (!speaker || !speaker.onImage) return;
+
+        speaker.RP = createRP(rX, rY);
+
+        // RP is the fraction of image dimensions from the image's top-left to the
+        // icon's centre. Subtract 15 (half of the 30 px icon) to get the div's top-left
+        // in speakerAreaElement coordinates.
+        const x = rX * imgRect.width  + (imgRect.left - areaRect.left) - 15;
+        const y = rY * imgRect.height + (imgRect.top  - areaRect.top)  - 15;
+
+        const speakerDiv = speaker.speakerDiv;
+        speakerDiv.style.transform = `translate(${x}px, ${y}px)`;
+        speakerDiv.setAttribute("data-x", x);
+        speakerDiv.setAttribute("data-y", y);
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -1144,8 +1224,14 @@ interact(".stage-image").dropzone({
 
         // If this drop completed a movement, persist it before clearing the reference
         if (dataStore.incompleteMovement) {
+            // Snapshot every placed speaker's position at this point in the script
+            dataStore.incompleteMovement.speakerPositions = speakers
+                .filter(s => s.RP)
+                .map(s => ({ initials: s.speakerInitials, speakerId: s.dbId, rX: s.RP.rX, rY: s.RP.rY }));
+            const spanId = dataStore.incompleteMovement.node?.id;
+            if (spanId) movementPositions.set(spanId, dataStore.incompleteMovement.speakerPositions);
             try {
-                await saveMovement(dataStore.incompleteMovement, speakerObj.dbId);
+                await saveMovement(dataStore.incompleteMovement, speakerObj.dbId, dataStore.productionId);
             } catch (err) {
                 console.error("saveMovement failed:", err);
             }
