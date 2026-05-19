@@ -12,7 +12,6 @@
  *  - Window resize handling (repositioning icons proportionally)
  *  - Keyboard navigation (arrows, page up/down, Escape)
  *  - Slider-based page navigation
- *  - Script download
  */
 
 import {
@@ -27,8 +26,7 @@ import {
 } from "../Modules/Backend.js";
 
 import {
-    getCurrentPageNumber, getPreviousMovementMarker,
-    getPageNumberAtCursor, getPageNumberAtMovement,
+    getCurrentPageNumber, getPageNumberAtMovement,
     getClickedCharacterPosition, getTotalPageCount,
     goToPage
 } from "../Modules/ScriptText.js";
@@ -130,12 +128,6 @@ let scrollIdleTimer = null;
 
 /** True while the user is dragging the page-navigation slider thumb. */
 let sliderDragging = false;
-
-/**
- * When false, right-click in the iframe shows our custom movement-start handler
- * rather than the browser's default context menu.
- */
-let contextMenuAllowed = true;
 
 /** Central state store for the session. */
 let dataStore = null;
@@ -264,7 +256,6 @@ async function playBlockerPageSetup() {
     slider.addEventListener("change", sliderOnChange);
     slider.oninput = function () {
         output.innerHTML = this.value;
-        // sliderMove() is a placeholder for future smooth-scroll behaviour
         slider.blur();
     };
 
@@ -311,7 +302,6 @@ async function playBlockerPageSetup() {
     window.addEventListener("resize", onResize);
 
     // Suppress the browser context menu inside the iframe; show ours instead
-    contextMenuAllowed = false;
     myIframe.contentWindow.addEventListener("contextmenu", async (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -978,30 +968,10 @@ function speakerInitialsFromDiv(div) {
     return div.id.split("-").pop();
 }
 
-/**
- * Converts pixel coordinates (relative to the stage image's top-left corner)
- * to proportional coordinates [0, 1].
- *
- * @param {{ x: number, y: number }} rawPosition - Pixel offsets from image origin
- * @returns {{ proportionalX: number, proportionalY: number }}
- */
-function xyToProportional(rawPosition) {
-    return {
-        proportionalX: rawPosition.x / stageImageRect.width,
-        proportionalY: rawPosition.y / stageImageRect.height
-    };
-}
-
 // ---------------------------------------------------------------------------
 // File handling
 // ---------------------------------------------------------------------------
 
-/**
- * Handles the "file selected" event from the file input.
- * Reads the selected HTML file and loads it into the script iframe.
- *
- * @param {Event} event - The change event from the file input
- */
 /**
  * Displays a status message below the file input.
  *
@@ -1012,33 +982,6 @@ function showMessage(message, type) {
     const messageDisplay = document.getElementById("message");
     messageDisplay.textContent = message;
     messageDisplay.style.color = type === "error" ? "red" : "green";
-}
-
-// ---------------------------------------------------------------------------
-// Script download
-// ---------------------------------------------------------------------------
-
-/**
- * Downloads the current state of the script (including any movement annotations)
- * as a plain-text file.  The file name is taken from the originally loaded file.
- */
-function downloadTextFile() {
-    const content  = myIframe.contentDocument.body.innerHTML;
-    const fileName = dataStore.script.fileName;
-
-    const blob = new Blob([content], { type: "text/plain" });
-    const url  = URL.createObjectURL(blob);
-
-    // Use a hidden anchor to trigger the browser's save dialog
-    const a = Object.assign(document.createElement("a"), {
-        href:     url,
-        download: fileName,
-        style:    "display:none"
-    });
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
 }
 
 // ---------------------------------------------------------------------------
@@ -1541,37 +1484,6 @@ function restoreSpeakerPositions(speakerPositions) {
 }
 
 // ---------------------------------------------------------------------------
-// Iframe selection wrapper (utility — currently not wired to UI)
-// ---------------------------------------------------------------------------
-
-/**
- * Wraps the current text selection inside the iframe with a new element.
- * Useful for future annotation features.
- *
- * @param {string} iframeId    - The iframe element id
- * @param {string} tagName     - The tag to wrap with, e.g. "span"
- * @param {string} [className] - Optional CSS class for the wrapper
- */
-function wrapIframeSelection(iframeId, tagName, className) {
-    const iframe     = document.getElementById(iframeId);
-    const iframeDoc  = iframe.contentDocument || iframe.contentWindow.document;
-    const selection  = iframe.contentWindow.getSelection();
-
-    if (selection.rangeCount > 0) {
-        const range   = selection.getRangeAt(0);
-        const wrapper = iframeDoc.createElement(tagName);
-        if (className) wrapper.className = className;
-
-        try {
-            range.surroundContents(wrapper);
-        } catch (e) {
-            // surroundContents throws if the selection spans block boundaries
-            console.error("wrapIframeSelection: selection crosses multiple nodes.", e);
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
 // DOMContentLoaded — entry point
 // ---------------------------------------------------------------------------
 
@@ -1826,7 +1738,6 @@ interact(".stage-image").dropzone({
         } catch (err) {
             console.error("saveSpeakers failed:", err);
         }
-        // Set this speakerObj as onImage = true;
         speakerObj.onImage = true;
 
         // If this drop completed a movement, persist it before clearing the reference
@@ -1876,7 +1787,6 @@ interact(".stage-image").dropzone({
         }
         if (dataStore.newMovement) {
             dataStore.newMovement = null;
-            console.log(getMovementListLog("ondrop", dataStore));
         }
     }
 
