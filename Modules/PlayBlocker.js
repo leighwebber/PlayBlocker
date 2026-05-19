@@ -308,13 +308,24 @@ async function playBlockerPageSetup() {
         event.preventDefault();
         event.stopPropagation();
 
-        // Right-clicking a movement marker span opens a Delete option
+        // Right-clicking a movement marker span opens Delete / Cancel options
         const markerSpan = event.target.closest("span.m-normal");
         if (markerSpan) {
             if (inEditMode || dataStore.newMovement || dataStore.incompleteMovement) return;
             const iframeRect = myIframe.getBoundingClientRect();
             showContextMenu(event.clientX + iframeRect.left, event.clientY + iframeRect.top, [
                 { label: "Delete movement", action: () => deleteMovementAtSpan(markerSpan.id) },
+                { label: "Cancel", action: () => {
+                    // Move cursor to just after the marker span and restore speaker positions
+                    const iframeDoc = myIframe.contentDocument;
+                    const span = iframeDoc.getElementById(markerSpan.id);
+                    if (!span) return;
+                    const range = iframeDoc.createRange();
+                    range.setStartAfter(span);
+                    range.collapse(true);
+                    const { targetPositions } = findTargetPositions(iframeDoc, range);
+                    commitCursorMove(iframeDoc, range, targetPositions);
+                }},
             ]);
             return;
         }
