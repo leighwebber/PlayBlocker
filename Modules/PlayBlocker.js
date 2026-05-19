@@ -37,7 +37,6 @@ import {
 } from "../Modules/Icons.js";
 
 import {
-    saveScript,
     fetchSpeakers,
     saveSpeakers,
     saveMovement,
@@ -228,7 +227,7 @@ async function playBlockerPageSetup() {
     };
 
     // Download button
-    document.getElementById("saveScript").addEventListener("click", saveScript);
+    document.getElementById("saveScript").addEventListener("click", saveProductionState);
 
     // Populate speaker icons in the speaker panel
     await insertSpeakers(speakerAreaElement);
@@ -328,7 +327,8 @@ async function loadProductionData() {
         await waitForIframe();
         myIframe.contentDocument.body.innerHTML = production.script_body;
         attachIFrameListeners();
-        loadMovementPositions();
+        await loadMovementPositions();
+        restoreAtCursor();
 
         const startingPage = getCurrentPageNumber(myIframe);
         pageCount          = getTotalPageCount(myIframe);
@@ -341,6 +341,67 @@ async function loadProductionData() {
         document.getElementById("slidecontainer").style.visibility = "visible";
         scriptLoaded = true;
     }
+}
+
+// ---------------------------------------------------------------------------
+// Save production state
+// ---------------------------------------------------------------------------
+
+/**
+ * Saves the current annotated script (including movement spans and the cursor
+ * marker) back to production.script_body so the session can be fully restored
+ * on the next load.
+ */
+async function saveProductionState() {
+    const scriptBody = myIframe.contentDocument.body.innerHTML;
+    const response   = await fetch(`${API_URL}/productions/${dataStore.productionId}/script`, {
+        method:      "PUT",
+        credentials: "include",
+        headers:     { "Content-Type": "application/json" },
+        body:        JSON.stringify({ scriptBody }),
+    });
+    showMessage(response.ok ? "Saved." : "Save failed.", response.ok ? "success" : "error");
+}
+
+// ---------------------------------------------------------------------------
+// Cursor-based restore
+// ---------------------------------------------------------------------------
+
+/**
+ * Scrolls the iframe to the saved cursor marker, then repositions all
+ * speaker divs to the snapshot recorded at the nearest preceding movement.
+ * Called automatically when a production is loaded.
+ */
+function restoreAtCursor() {
+    const iframeDoc = myIframe.contentDocument;
+    const cursor    = iframeDoc.getElementById("script-cursor");
+    if (!cursor) return;
+
+    cursor.scrollIntoView({ behavior: "instant", block: "center" });
+
+    const cursorRange = iframeDoc.createRange();
+    cursorRange.selectNode(cursor);
+
+    let targetPositions = null;
+    let targetSpanRange = null;
+
+    iframeDoc.querySelectorAll("span.m-normal").forEach(span => {
+        if (!movementPositions.has(span.id)) return;
+        const spanRange = iframeDoc.createRange();
+        spanRange.selectNode(span);
+        if (spanRange.compareBoundaryPoints(Range.END_TO_START, cursorRange) <= 0) {
+            if (!targetSpanRange ||
+                spanRange.compareBoundaryPoints(Range.START_TO_START, targetSpanRange) > 0) {
+                targetPositions = movementPositions.get(span.id);
+                targetSpanRange = spanRange;
+            }
+        }
+    });
+
+    // Clear any stale shadow divs and markers from a previous session
+    speakerAreaElement.querySelectorAll('[id^="shadow-div-"], .movement-marker').forEach(el => el.remove());
+
+    if (targetPositions) restoreSpeakerPositions(targetPositions);
 }
 
 // ---------------------------------------------------------------------------
@@ -904,7 +965,29 @@ function startMovement(e) {
  * Must be called after the iframe body is replaced (e.g. on file load).
  */
 function attachIFrameListeners() {
-    myIframe.contentDocument.addEventListener("click", onScriptClick);
+    const iframeDoc = myIframe.contentDocument;
+    iframeDoc.addEventListener("click", onScriptClick);
+
+    // Inject cursor style if not already present (survives body replacement, not head replacement)
+    if (!iframeDoc.getElementById("pb-cursor-style")) {
+        const style = iframeDoc.createElement("style");
+        style.id = "pb-cursor-style";
+        style.textContent = `
+            #script-cursor {
+                display: inline;
+                color: #0066cc;
+                font-size: 1.5em;
+                font-weight: normal;
+                user-select: none;
+                pointer-events: none;
+                vertical-align: text-bottom;
+                line-height: 0;
+                animation: pb-cursor-blink 1s step-end infinite;
+            }
+            @keyframes pb-cursor-blink { 50% { opacity: 0; } }
+        `;
+        iframeDoc.head.appendChild(style);
+    }
 }
 
 /**
@@ -936,8 +1019,21 @@ function onScriptClick(e) {
     const caretRange = iframeDoc.caretRangeFromPoint(e.clientX, e.clientY);
     if (!caretRange) return;
 
+    // Move the cursor marker to the click position
+    const oldCursor = iframeDoc.getElementById("script-cursor");
+    if (oldCursor) oldCursor.remove();
+    const cursor = iframeDoc.createElement("span");
+    cursor.id        = "script-cursor";
+    cursor.className = "script-cursor";
+    cursor.textContent = "|";
+    caretRange.insertNode(cursor);
+
     let targetPositions = null;
     let targetSpanRange = null;
+
+    // Use the cursor's position as the reference point so restoreAtCursor() agrees
+    const cursorRange = iframeDoc.createRange();
+    cursorRange.selectNode(cursor);
 
     iframeDoc.querySelectorAll("span.m-normal").forEach(span => {
         if (!movementPositions.has(span.id)) return;
@@ -945,8 +1041,8 @@ function onScriptClick(e) {
         const spanRange = iframeDoc.createRange();
         spanRange.selectNode(span);
 
-        // Span must end at or before the caret
-        if (spanRange.compareBoundaryPoints(Range.END_TO_START, caretRange) <= 0) {
+        // Span must end at or before the cursor
+        if (spanRange.compareBoundaryPoints(Range.END_TO_START, cursorRange) <= 0) {
             // Among qualifying spans, keep the one latest in document order
             if (!targetSpanRange ||
                 spanRange.compareBoundaryPoints(Range.START_TO_START, targetSpanRange) > 0) {
