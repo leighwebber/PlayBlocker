@@ -51,6 +51,9 @@ import {
 /** True while an Interact.js drag is actively in progress. */
 let isDragging = false;
 
+/** True when the script or cursor has changed since the last save. */
+let isDirty = false;
+
 /** Sequential counter for movement-marker element ids. */
 let markerCount = 0;
 
@@ -111,6 +114,12 @@ let dataStore = null;
 // ---------------------------------------------------------------------------
 
 const API_URL = "https://lwebber.ca/api";
+
+window.addEventListener("beforeunload", (e) => {
+    if (!isDirty) return;
+    e.preventDefault();
+    e.returnValue = ""; // required for Chrome to show the dialog
+});
 
 // ---------------------------------------------------------------------------
 // Auth forms — Register / Login / Logout
@@ -340,6 +349,7 @@ async function loadProductionData() {
         document.getElementById("saveScript").style.visibility    = "visible";
         document.getElementById("slidecontainer").style.visibility = "visible";
         scriptLoaded = true;
+        isDirty = false;
     }
 }
 
@@ -360,6 +370,7 @@ async function saveProductionState() {
         headers:     { "Content-Type": "application/json" },
         body:        JSON.stringify({ scriptBody }),
     });
+    if (response.ok) isDirty = false;
     showMessage(response.ok ? "Saved." : "Save failed.", response.ok ? "success" : "error");
 }
 
@@ -1036,6 +1047,7 @@ function onScriptClick(e) {
     cursor.className = "script-cursor";
     cursor.textContent = "|";
     caretRange.insertNode(cursor);
+    isDirty = true;
 
     let targetPositions = null;
     let targetSpanRange = null;
@@ -1349,6 +1361,7 @@ interact(".stage-image").dropzone({
                 console.error("saveMovement failed:", err);
             }
             dataStore.incompleteMovement = null;
+            isDirty = true;
         }
         if (dataStore.newMovement) {
             dataStore.newMovement = null;
