@@ -1848,11 +1848,26 @@ interact(".stage-image").dropzone({
 
             if (spanId) movementAnchorData.set(spanId, { paraIndex, textOffset: rawOffset, moverInitials: speakerObj.speakerInitials });
 
+            let newMovementDbId = null;
             try {
-                await saveMovement(dataStore.incompleteMovement, speakerObj.dbId, dataStore.productionId, paraIndex, rawOffset);
+                newMovementDbId = await saveMovement(dataStore.incompleteMovement, speakerObj.dbId, dataStore.productionId, paraIndex, rawOffset);
             } catch (err) {
                 console.error("saveMovement failed:", err);
             }
+
+            // Register immediately so peek and edit work without a page reload
+            if (spanId) {
+                const mov = dataStore.incompleteMovement;
+                completedMovements.set(spanId, {
+                    dbId:            newMovementDbId,
+                    moverInitials:   speakerObj.speakerInitials,
+                    shadowRP:        mov.shadowRP  ? { rX: mov.shadowRP.rX,  rY: mov.shadowRP.rY  } : null,
+                    endRP:           speakerObj.RP ? { rX: speakerObj.RP.rX, rY: speakerObj.RP.rY } : null,
+                    waypoints:       mov.movementMarkers.map(m => ({ rX: m._rp?.rX ?? null, rY: m._rp?.rY ?? null })),
+                    speakerPositions: mov.speakerPositions ?? [],
+                });
+            }
+
             dataStore.incompleteMovement = null;
             isDirty = true;
 

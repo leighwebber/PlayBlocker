@@ -125,6 +125,9 @@ export async function saveMovement(movement, speakerDbId, productionId, paraInde
     if (!response.ok) {
         throw new Error(`Failed to save movement: ${response.statusText}`);
     }
+
+    const { id } = await response.json();
+    return id;
 }
 
 // ---------------------------------------------------------------------------
