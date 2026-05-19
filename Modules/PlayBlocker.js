@@ -97,6 +97,9 @@ let inEditMode = false;
  */
 let editState = null;
 
+/** DOM elements created for the mousedown path-peek; cleared on mouseup. */
+let peekElements = [];
+
 /** The speaker panel container element. */
 let speakerAreaElement = null;
 
@@ -265,6 +268,8 @@ async function playBlockerPageSetup() {
     document.addEventListener("click", () => hideContextMenu());
 
     speakerAreaElement.addEventListener("contextmenu", onSpeakerAreaContextMenu);
+    speakerAreaElement.addEventListener("mousedown",   onSpeakerDivMouseDown);
+    document.addEventListener("mouseup", hideMovementPeek);
 
     // Populate speaker icons in the speaker panel
     await insertSpeakers(speakerAreaElement);
@@ -1650,6 +1655,93 @@ interact(".stage-image").dropzone({
 
 // Ensure the dropzone also accepts .draggable elements (belt-and-suspenders)
 interact(".dropzone").dropzone({ accept: ".draggable" });
+
+// ---------------------------------------------------------------------------
+// Movement path peek (mousedown-hold on an on-stage speaker)
+// ---------------------------------------------------------------------------
+
+function onSpeakerDivMouseDown(e) {
+    if (e.button !== 0 || inEditMode) return;
+    const target = e.target.closest('[id^="speaker-div-"]');
+    if (!target) return;
+    const initials = target.id.replace("speaker-div-", "");
+    const speaker  = speakers.find(s => s.speakerInitials === initials);
+    if (!speaker?.onImage) return;
+    showMovementPeek(speaker);
+}
+
+/**
+ * Displays the shadow div and waypoints for the last movement of `speaker`
+ * before the current cursor position.  All elements are pointer-events:none
+ * so they don't interfere with the mouse interaction.
+ */
+function showMovementPeek(speaker) {
+    hideMovementPeek();
+
+    const iframeDoc = myIframe.contentDocument;
+    const cursor    = iframeDoc.getElementById("script-cursor");
+    if (!cursor) return;
+
+    const cursorRange = iframeDoc.createRange();
+    cursorRange.selectNode(cursor);
+
+    let peekSpanId    = null;
+    let peekSpanRange = null;
+
+    iframeDoc.querySelectorAll("span.m-normal").forEach(span => {
+        const anchor = movementAnchorData.get(span.id);
+        if (anchor?.moverInitials !== speaker.speakerInitials) return;
+
+        const spanRange = iframeDoc.createRange();
+        spanRange.selectNode(span);
+        if (spanRange.compareBoundaryPoints(Range.END_TO_START, cursorRange) > 0) return;
+
+        if (!peekSpanRange ||
+            spanRange.compareBoundaryPoints(Range.START_TO_START, peekSpanRange) > 0) {
+            peekSpanId    = span.id;
+            peekSpanRange = spanRange;
+        }
+    });
+
+    if (!peekSpanId) return;
+    const movData = completedMovements.get(peekSpanId);
+    if (!movData?.shadowRP) return;
+
+    const imgRect  = stageImageElement.getBoundingClientRect();
+    const areaRect = speakerAreaElement.getBoundingClientRect();
+
+    // Shadow div — paler ghost, not draggable
+    const shadowX = movData.shadowRP.rX * imgRect.width  + (imgRect.left - areaRect.left) - 15;
+    const shadowY = movData.shadowRP.rY * imgRect.height + (imgRect.top  - areaRect.top)  - 15;
+    const shadowDiv = createSpeakerDiv(dataStore, speaker,
+        { currentX: shadowX, currentY: shadowY, yIncrement: 0, bottomOfColumnY: 0, topOfColumnY: 0 },
+        true
+    );
+    shadowDiv.id = `peek-shadow-div-${speaker.speakerInitials}`;
+    shadowDiv.classList.remove("draggable");
+    shadowDiv.style.pointerEvents = "none";
+    shadowDiv.style.zIndex = "100";
+    speakerAreaElement.appendChild(shadowDiv);
+    peekElements.push(shadowDiv);
+
+    // Waypoint markers
+    movData.waypoints.forEach(wp => {
+        const markerX = wp.rX * imgRect.width  + (imgRect.left - areaRect.left) - 5;
+        const markerY = wp.rY * imgRect.height + (imgRect.top  - areaRect.top)  - 5;
+        const markerDiv = createMovementMarkerDiv(markerX, markerY, speaker.backgroundColor, markerCount++);
+        speakerAreaElement.appendChild(markerDiv);
+        peekElements.push(markerDiv);
+    });
+
+    // Connector chain: shadow → waypoints → speakerDiv
+    const markers = peekElements.filter(el => el.classList.contains("movement-marker"));
+    redrawChain([shadowDiv, ...markers, speaker.speakerDiv]);
+}
+
+function hideMovementPeek() {
+    peekElements.forEach(el => el.remove());
+    peekElements = [];
+}
 
 // ---------------------------------------------------------------------------
 // Context menu
