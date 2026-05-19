@@ -199,6 +199,10 @@ async function playBlockerPageSetup() {
     myIframe  = document.getElementById("script-iframe");
     dataStore = new DataStore(myIframe);
 
+    // During development, the productionID is hard coded. IRL, the
+    // user will select the current production from an options page
+    dataStore.productionId = 1;
+
     // Speaker panel height (needed for column-wrap in createSpeakerDiv)
     speakerAreaElement = document.getElementById("image-area");
     dataStore.speakerAreaHeight = speakerAreaElement.getBoundingClientRect().height;

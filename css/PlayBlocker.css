@@ -164,6 +164,7 @@ iframe {
   stroke: black;
   fill: none;
   stroke-width: 2;
+  vector-effect: non-scaling-stroke;
   pointer-events: none !important; /* Make the line non-interactive */
   z-index: 5000;
 }
