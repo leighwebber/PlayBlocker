@@ -1191,8 +1191,8 @@ function navigateToSpeech(direction) {
             for (const para of [...speechParas].reverse()) {
                 const paraRange = iframeDoc.createRange();
                 paraRange.selectNodeContents(para);
-                // Find last Speech whose end is strictly before the cursor
-                if (paraRange.compareBoundaryPoints(Range.END_TO_START, cursorRange) < 0) {
+                // Find last Speech whose end is strictly before the cursor's start
+                if (paraRange.compareBoundaryPoints(Range.START_TO_END, cursorRange) < 0) {
                     target = para;
                     break;
                 }
