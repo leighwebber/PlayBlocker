@@ -1206,6 +1206,15 @@ function navigateToSpeech(direction) {
     range.setStart(target, 0);
     range.collapse(true);
 
+    // Skip past any consecutive movement marker spans at the start of the paragraph
+    // so the cursor lands in editable text rather than immediately beside a marker.
+    let child = target.firstChild;
+    while (child?.nodeType === Node.ELEMENT_NODE && child.classList.contains("m-normal")) {
+        range.setStartAfter(child);
+        range.collapse(true);
+        child = child.nextSibling;
+    }
+
     target.scrollIntoView({ behavior: "smooth", block: "center" });
 
     const { targetPositions } = findTargetPositions(iframeDoc, range);
