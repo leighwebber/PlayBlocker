@@ -1343,6 +1343,18 @@ function isAdjacentLeftOf(cursor, markerSpan) {
     return node === markerSpan;
 }
 
+/**
+ * Returns true when cursor is positioned immediately to the right of
+ * markerSpan (allowing for adjacent empty text nodes).
+ */
+function isAdjacentRightOf(cursor, markerSpan) {
+    let node = cursor.previousSibling;
+    while (node && node.nodeType === Node.TEXT_NODE && node.textContent.trim() === "") {
+        node = node.previousSibling;
+    }
+    return node === markerSpan;
+}
+
 /** Cancels any in-progress arrow-key peek (timeout + listener + visuals). */
 function clearArrowPeek() {
     if (peekTimeoutHandle !== null) { clearTimeout(peekTimeoutHandle); peekTimeoutHandle = null; }
@@ -1385,25 +1397,18 @@ function arrowLeft() {
     const cursor = iframeDoc.getElementById("script-cursor");
     if (!cursor) return;
 
-    const cursorRange = iframeDoc.createRange();
-    cursorRange.selectNode(cursor);
+    // All m-normal spans that precede the cursor in document order
+    const before = Array.from(iframeDoc.querySelectorAll("span.m-normal")).filter(span =>
+        cursor.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_PRECEDING
+    );
+    if (before.length === 0) return;
 
-    let bestSpan = null;
-    let bestRange = null;
-
-    iframeDoc.querySelectorAll("span.m-normal").forEach(span => {
-        const spanRange = iframeDoc.createRange();
-        spanRange.selectNode(span);
-        // Keep spans whose end is at or before cursor start (span.end ≤ cursor.start)
-        if (spanRange.compareBoundaryPoints(Range.END_TO_START, cursorRange) <= 0) {
-            if (!bestRange || spanRange.compareBoundaryPoints(Range.START_TO_START, bestRange) > 0) {
-                bestSpan = span;
-                bestRange = spanRange;
-            }
-        }
-    });
-
-    if (!bestSpan) return;
+    // Last entry is nearest to cursor; if cursor is immediately after it, skip to the one before
+    let bestSpan = before[before.length - 1];
+    if (isAdjacentRightOf(cursor, bestSpan)) {
+        if (before.length < 2) return;
+        bestSpan = before[before.length - 2];
+    }
 
     const range = iframeDoc.createRange();
     range.setStartAfter(bestSpan);
@@ -1424,25 +1429,13 @@ function arrowRight() {
     const cursor = iframeDoc.getElementById("script-cursor");
     if (!cursor) return;
 
-    const cursorRange = iframeDoc.createRange();
-    cursorRange.selectNode(cursor);
+    // All m-normal spans that follow the cursor in document order; first entry is nearest
+    const after = Array.from(iframeDoc.querySelectorAll("span.m-normal")).filter(span =>
+        cursor.compareDocumentPosition(span) & Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    if (after.length === 0) return;
 
-    let nearestSpan = null;
-    let nearestRange = null;
-
-    iframeDoc.querySelectorAll("span.m-normal").forEach(span => {
-        const spanRange = iframeDoc.createRange();
-        spanRange.selectNode(span);
-        // Keep spans whose start is strictly after cursor end (span.start > cursor.end)
-        if (spanRange.compareBoundaryPoints(Range.START_TO_END, cursorRange) > 0) {
-            if (!nearestRange || spanRange.compareBoundaryPoints(Range.START_TO_START, nearestRange) < 0) {
-                nearestSpan = span;
-                nearestRange = spanRange;
-            }
-        }
-    });
-
-    if (!nearestSpan) return;
+    const nearestSpan = after[0];
 
     if (isAdjacentLeftOf(cursor, nearestSpan)) {
         // Move past the span and show peek
