@@ -103,18 +103,18 @@ document.addEventListener('click', (e) => {
 async function validateSession() {
     try {
         const res = await fetch(`${API_URL}/validate`, { method: 'GET', credentials: 'include' });
-        if (!res.ok) { window.location.href = '/login.html'; return; }
+        if (!res.ok) { window.location.href = '/index.html'; return; }
         const data = await res.json();
         document.getElementById('username').textContent =
             [data.first_name, data.last_name].filter(Boolean).join(' ');
     } catch {
-        window.location.href = '/login.html';
+        window.location.href = '/index.html';
     }
 }
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
     await fetch(`${API_URL}/logout`, { method: 'POST', credentials: 'include' });
-    window.location.href = '/login.html';
+    window.location.href = '/index.html';
 });
 
 // ---------------------------------------------------------------------------

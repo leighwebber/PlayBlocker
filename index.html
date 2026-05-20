@@ -1,48 +1,227 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Hello World</title>
-    <script type="module" src="../node_modules/interactjs/dist/interact.min.js"></script>
-    <script type="module" src="../Modules/PlayBlocker.js"></script>
-    <script type="module" src="../index.js"></script>
-    <link rel="stylesheet" href="../css/PlayBlocker.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlayBlocker</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Lucida Sans', Geneva, Verdana, sans-serif;
+            font-size: 14px;
+            background: #1a2a3a;
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            align-items: stretch;
+        }
+
+        /* ---- Left panel: branding ---- */
+        .brand-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 60px 56px;
+            color: #fff;
+        }
+
+        .brand-panel h1 {
+            font-family: 'Gill Sans', Calibri, 'Trebuchet MS', sans-serif;
+            font-size: 42pt;
+            font-weight: normal;
+            letter-spacing: -1px;
+            margin-bottom: 18px;
+            color: #fff;
+        }
+
+        .brand-panel .tagline {
+            font-size: 16px;
+            color: #8ab4d4;
+            margin-bottom: 32px;
+            line-height: 1.5;
+        }
+
+        .brand-panel .description {
+            font-size: 14px;
+            color: #aac4d8;
+            line-height: 1.7;
+            max-width: 420px;
+        }
+
+        .brand-panel .description p { margin-bottom: 12px; }
+        .brand-panel .description p:last-child { margin-bottom: 0; }
+
+        /* ---- Right panel: auth forms ---- */
+        .auth-panel {
+            width: 420px;
+            flex-shrink: 0;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 56px 48px;
+        }
+
+        .auth-panel h2 {
+            font-family: 'Gill Sans', Calibri, 'Trebuchet MS', sans-serif;
+            font-size: 22pt;
+            font-weight: normal;
+            color: #222;
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+            font-family: inherit;
+            color: #333;
+            transition: border-color 0.15s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.12);
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 11px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 15px;
+            font-family: inherit;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: background 0.15s;
+        }
+
+        .btn-primary:hover { background: #0056b3; }
+
+        .switch-link {
+            margin-top: 20px;
+            font-size: 13px;
+            color: #666;
+            text-align: center;
+        }
+
+        .switch-link a {
+            color: #007bff;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .switch-link a:hover { text-decoration: underline; }
+
+        #registerForm { display: none; }
+
+        #error-msg {
+            background: #fff3f3;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        #protected-area { display: none; }
+    </style>
+    <script src="./index.js" defer></script>
 </head>
-<body id="homePage">
+<body>
+
+<div class="brand-panel">
     <h1>PlayBlocker</h1>
-    <p>An app for designing blocking for a play.</p>
-    <div id="auth-forms">
-        <h2>Register</h2>
-        <form id="registerForm">
-            <input type="firstname" name="firstname" placeholder="First name" required>
-            <input type="lastname" name="lastname" placeholder="Last name" required>
-            <input type="email" name="email" placeholder="Email" required>
-            <input type="password" name="password" placeholder="Password" required>
-            <button type="submit">Register</button>
-        </form>
-
-        <h2>Login</h2>
-        <form id="loginForm">
-            <input type="email" name="email" placeholder="Email" required>
-            <input type="password" name="password" placeholder="Password" required>
-            <button type="submit">Login</button>
-        </form>
-        <h2>Logout</h2>
-        <button id="logout_button" onclick="logout()">Log out</button>
+    <p class="tagline">Stage blocking software for theatre directors.</p>
+    <div class="description">
+        <p>Upload a floor plan of your set and an HTML-formatted script, then place your actors on the diagram and annotate the script with movement markers as you work through a blocking session.</p>
+        <p>Every position and movement is saved to the server so sessions can be resumed exactly where you left off.</p>
     </div>
-
-<div id="protected-area" style="display:none;">
-  <h2>Welcome!</h2>
-  <a href="./Pages/Productions.html">Productions</a>
-  <a href="./Pages/PlayBlocker.html">PlayBlocker</a>
 </div>
 
+<div class="auth-panel">
+    <div id="error-msg"></div>
 
+    <div id="loginSection">
+        <h2>Sign in</h2>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="login-email">Email</label>
+                <input type="email" id="login-email" name="email" placeholder="you@example.com" required>
+            </div>
+            <div class="form-group">
+                <label for="login-password">Password</label>
+                <input type="password" id="login-password" name="password" placeholder="Password" required>
+            </div>
+            <button type="submit" class="btn-primary">Sign in</button>
+        </form>
+        <p class="switch-link">New to PlayBlocker? <a href="#" id="show-register">Create an account</a></p>
+    </div>
 
+    <div id="registerSection" style="display:none">
+        <h2>Create account</h2>
+        <form id="registerForm" style="display:block">
+            <div class="form-group">
+                <label for="reg-firstname">First name</label>
+                <input type="text" id="reg-firstname" name="firstname" placeholder="First name" required>
+            </div>
+            <div class="form-group">
+                <label for="reg-lastname">Last name</label>
+                <input type="text" id="reg-lastname" name="lastname" placeholder="Last name" required>
+            </div>
+            <div class="form-group">
+                <label for="reg-email">Email</label>
+                <input type="email" id="reg-email" name="email" placeholder="you@example.com" required>
+            </div>
+            <div class="form-group">
+                <label for="reg-password">Password</label>
+                <input type="password" id="reg-password" name="password" placeholder="Password" required>
+            </div>
+            <button type="submit" class="btn-primary">Create account</button>
+        </form>
+        <p class="switch-link">Already have an account? <a href="#" id="show-login">Sign in</a></p>
+    </div>
+</div>
 
+<div id="protected-area"></div>
 
-    
-    
+<script>
+    document.getElementById('show-register').addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('loginSection').style.display = 'none';
+        document.getElementById('registerSection').style.display = 'block';
+        document.getElementById('error-msg').style.display = 'none';
+    });
+    document.getElementById('show-login').addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('registerSection').style.display = 'none';
+        document.getElementById('loginSection').style.display = 'block';
+        document.getElementById('error-msg').style.display = 'none';
+    });
+</script>
+
 </body>
 </html>
-

@@ -7,7 +7,7 @@
             const VALIDATE_URL = "https://lwebber.ca/api/validate";
 
             // Pages that should never trigger a redirect (e.g. the login page itself)
-            const PUBLIC_PATHS = ["/login", "/login.html"];
+            const PUBLIC_PATHS = ["/login", "/login.html", "/index.html", "/"];
 
             const isPublicPage = PUBLIC_PATHS.some(p =>
                 window.location.pathname === p || window.location.pathname.startsWith(p)
@@ -32,14 +32,14 @@
                 } else {
                     // 401 / 403 → token missing, expired, or invalid
                     if (!isPublicPage) {
-                    window.location.href = "/login.html?reason=session_expired";
+                    window.location.href = "/index.html?reason=session_expired";
                     }
                 }
             } catch (err) {
                 // Network error or server unreachable
                 console.warn("[auth] Validation request failed:", err);
                 if (!isPublicPage) {
-                    window.location.href = "/login?reason=network_error";
+                    window.location.href = "/index.html?reason=network_error";
                 }
             }
         })();
