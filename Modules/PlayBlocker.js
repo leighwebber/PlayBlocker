@@ -1926,6 +1926,10 @@ function onScriptClick(e) {
 
     const { targetPositions } = findTargetPositions(iframeDoc, caretRange);
     commitCursorMove(iframeDoc, caretRange, targetPositions);
+
+    // Return keyboard focus to the parent window so that handleKeyDown receives
+    // arrow keys, Tab, and other shortcuts after the user clicks in the script.
+    window.focus();
 }
 
 /**
