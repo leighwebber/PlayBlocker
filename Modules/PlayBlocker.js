@@ -330,7 +330,7 @@ async function playBlockerPageSetup() {
             return;
         }
 
-        if (event.target.className !== "Speech" && event.target.className !== "StageDirection") {
+        if (!event.target.classList.contains("Speech") && !event.target.classList.contains("StageDirection")) {
             alert("You can only create a movement inside the text of a Speech or a StageDirection");
             return;
         }
@@ -1323,7 +1323,7 @@ function handleEscapeKey() {
  * @param {MouseEvent} e - The contextmenu event from inside the iframe
  */
 function startMovement(e, paragraphOffset = null) {
-    if (e.target.className !== "Speech" && e.target.className !== "StageDirection") {
+    if (!e.target.classList.contains("Speech") && !e.target.classList.contains("StageDirection")) {
         alert("You can only insert a movement in a speech paragraph or a stage direction.");
         return;
     }
