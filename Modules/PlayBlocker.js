@@ -536,6 +536,7 @@ function insertSpanAtRawOffset(iframeDoc, paraElement, rawOffset, span) {
                 range.setStart(node, remaining);
                 range.collapse(true);
                 range.insertNode(span);
+                span.after(iframeDoc.createTextNode(" "));
                 inserted = true;
             } else {
                 remaining -= node.length;
@@ -563,6 +564,7 @@ function insertSpanAtRawOffset(iframeDoc, paraElement, rawOffset, span) {
         range.selectNodeContents(paraElement);
         range.collapse(false);
         range.insertNode(span);
+        span.after(iframeDoc.createTextNode(" "));
     }
 }
 

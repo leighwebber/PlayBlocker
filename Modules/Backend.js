@@ -634,6 +634,7 @@ export class Movement {
         containingElement.innerHTML =
             html.substring(0, htmlOffset) +
             this.#span.outerHTML +
+            " " +
             html.substring(htmlOffset);
     }
 
