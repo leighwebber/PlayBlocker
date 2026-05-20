@@ -22,6 +22,8 @@ const textFileInput       = document.getElementById('text-file-input');
 const scriptStatus        = document.getElementById('script-status');
 const speakersSection     = document.getElementById('speakers-section');
 const speakersTbody       = document.getElementById('speakers-tbody');
+const scenesSection       = document.getElementById('scenes-section');
+const scenesGrid          = document.getElementById('scenes-grid');
 const colorPickerPopup    = document.getElementById('color-picker-popup');
 const colorGrid           = document.getElementById('color-grid');
 const colorSearch         = document.getElementById('color-search');
@@ -193,11 +195,13 @@ async function selectProduction(id) {
         scriptStatus.textContent = 'Script loaded.';
         imageSection.hidden = false;
         buildSpeakerList(production.script_body, existingSpeakers);
+        await loadAndRenderScenes(id);
     } else {
         scriptStatus.textContent = '';
         currentSpeakers = [];
         speakersSection.hidden = true;
         imageSection.hidden = true;
+        scenesSection.hidden = true;
     }
 }
 
@@ -314,10 +318,132 @@ textFileInput.addEventListener('change', async (e) => {
 
     scriptStatus.textContent = 'Script converted and saved.';
     imageSection.hidden = false;
+    await syncScenes(selectedProductionId, bodyHtml);
     const speakerRes       = await fetch(`${API_URL}/speakers?productionId=${selectedProductionId}`, { credentials: 'include' });
     const existingSpeakers = speakerRes.ok ? await speakerRes.json() : [];
     buildSpeakerList(bodyHtml, existingSpeakers);
 });
+
+// ---------------------------------------------------------------------------
+// Scene structure: extract → sync → render
+// ---------------------------------------------------------------------------
+
+function extractSceneStructure(scriptHtml) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<html><body>${scriptHtml}</body></html>`, 'text/html');
+    const acts = [];
+    let currentAct = null;
+    let actNumber  = 0;
+
+    for (const p of doc.querySelectorAll('p')) {
+        if (p.className === 'Act') {
+            actNumber++;
+            currentAct = { actNumber, actTitle: p.textContent.trim(), scenes: [] };
+            acts.push(currentAct);
+        } else if (p.className === 'Scene') {
+            if (!currentAct) {
+                actNumber++;
+                currentAct = { actNumber, actTitle: '', scenes: [] };
+                acts.push(currentAct);
+            }
+            currentAct.scenes.push({
+                sceneNumber: currentAct.scenes.length + 1,
+                sceneTitle:  p.textContent.trim(),
+            });
+        }
+    }
+    return acts;
+}
+
+async function syncScenes(productionId, scriptHtml) {
+    const acts = extractSceneStructure(scriptHtml);
+    if (!acts.length) { scenesSection.hidden = true; return; }
+    const res = await fetch(`${API_URL}/productions/${productionId}/scenes`, {
+        method:      'POST',
+        credentials: 'include',
+        headers:     { 'Content-Type': 'application/json' },
+        body:        JSON.stringify(acts),
+    });
+    if (!res.ok) { console.error('syncScenes failed'); return; }
+    const { acts: savedActs } = await res.json();
+    renderSceneGrid(savedActs);
+}
+
+async function loadAndRenderScenes(productionId) {
+    const res = await fetch(`${API_URL}/productions/${productionId}/scenes`, { credentials: 'include' });
+    if (!res.ok) { scenesSection.hidden = true; return; }
+    const acts = await res.json();
+    renderSceneGrid(acts);
+}
+
+function renderSceneGrid(acts) {
+    scenesGrid.innerHTML = '';
+    if (!acts || !acts.length) { scenesSection.hidden = true; return; }
+
+    scenesSection.hidden = false;
+
+    for (const act of acts) {
+        const header = document.createElement('div');
+        header.className = 'scene-act-header';
+        header.textContent = act.actTitle || `Act ${act.actNumber}`;
+        scenesGrid.appendChild(header);
+
+        for (const scene of act.scenes) {
+            const row = document.createElement('div');
+            row.className = 'scene-row';
+
+            const title = document.createElement('span');
+            title.className = 'scene-title';
+            title.textContent = scene.sceneTitle || `Scene ${scene.sceneNumber}`;
+            row.appendChild(title);
+
+            // Thumbnail (shown when an image already exists)
+            const thumb = document.createElement('img');
+            thumb.className = 'scene-thumb';
+            thumb.alt = 'Scene image';
+            if (scene.image) {
+                thumb.src = scene.image;
+            } else {
+                thumb.hidden = true;
+            }
+            row.appendChild(thumb);
+
+            // Upload label/button
+            const label = document.createElement('label');
+            label.className = 'upload-label';
+            label.style.flexShrink = '0';
+            label.textContent = scene.image ? 'Replace' : 'Upload';
+            const fileInput = document.createElement('input');
+            fileInput.type   = 'file';
+            fileInput.accept = 'image/*';
+            fileInput.hidden = true;
+            fileInput.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const dataUrl = await new Promise(resolve => {
+                    const reader = new FileReader();
+                    reader.onload = ev => resolve(ev.target.result);
+                    reader.readAsDataURL(file);
+                });
+                const saveRes = await fetch(`${API_URL}/scenes/${scene.id}/image`, {
+                    method:      'PUT',
+                    credentials: 'include',
+                    headers:     { 'Content-Type': 'application/json' },
+                    body:        JSON.stringify({ image: dataUrl }),
+                });
+                if (!saveRes.ok) { alert('Failed to save scene image.'); return; }
+                thumb.src    = dataUrl;
+                thumb.hidden = false;
+                label.textContent = 'Replace';
+                fileInput.value   = '';
+            });
+            label.appendChild(fileInput);
+            row.appendChild(label);
+
+            scenesGrid.appendChild(row);
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Speaker list: parse script → merge with DB → render form
