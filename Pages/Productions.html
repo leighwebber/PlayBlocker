@@ -290,6 +290,35 @@
         .open-btn-row {
             margin-top: 10px;
         }
+
+        /* ---- Welcome / help banner ---- */
+        #help-banner {
+            background: #eaf4ff;
+            border: 1px solid #b6d9f7;
+            border-radius: 6px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+        }
+
+        #help-banner a.help-start-link {
+            display: inline-block;
+            font-size: 15px;
+            font-weight: bold;
+            color: #0056b3;
+            text-decoration: none;
+            margin-bottom: 10px;
+        }
+
+        #help-banner a.help-start-link:hover { text-decoration: underline; }
+
+        #help-banner p {
+            font-size: 13px;
+            color: #444;
+            line-height: 1.5;
+            margin: 0;
+        }
+
+        #help-banner strong { color: #333; }
     </style>
 </head>
 <body>
@@ -312,6 +341,17 @@
     </div>
 
     <div id="detail-panel">
+
+        <div id="help-banner">
+            <a class="help-start-link" href="/Pages/help.html" target="_blank">
+                New to PlayBlocker? Here's an overview of how the app works →
+            </a>
+            <p>When you open a production in the PlayBlocker workspace you'll notice small
+            <strong>?</strong> badges in the corners of the stage image and script panels.
+            Hover over a badge to see a context-sensitive hint for that area in the hint bar
+            at the bottom of the screen.</p>
+        </div>
+
         <p id="detail-empty">Select or create a production to get started.</p>
 
         <div id="detail-content" hidden>
