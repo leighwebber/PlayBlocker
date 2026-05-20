@@ -1,0 +1,645 @@
+p: 1
+a: Act 1
+n: Scene 1 — The Kitchen, a Tuesday Evening
+d: (The kitchen of a comfortable suburban home. Dinner dishes are half-cleared. MARGARET, 45, sets a pie on the table. DAVID, 47, pours coffee. TYLER, 17, is already angling toward the door. ASHLEY, 14, reads at the table. COOPER, 10, still has shin guards on. ZOE, 6, has arranged her fork and spoon into a person.)
+c: Margaret
+s: Nobody leaves this table. I made pie.
+c: Tyler
+s: Mom, I told Brandon I'd—
+c: Margaret
+s: Pie, Tyler.
+d: (Tyler drops back into his chair with theatrical suffering.)
+c: Zoe
+s: (to her fork-person) You have to stay too.
+c: David
+s: Your mother and I want to talk to you all about something.
+c: Cooper
+s: Am I in trouble?
+c: David
+s: No, Coop.
+c: Cooper
+s: Is Tyler in trouble?
+c: Tyler
+s: Why is it automatically me?
+c: Ashley
+s: (without looking up from her book) Statistical probability.
+c: Margaret
+s: Nobody is in trouble. We have some news. We've been thinking for a while about — expanding our family.
+d: (A beat. The kids process this at different speeds.)
+c: Cooper
+s: You mean like a dog?
+c: David
+s: Not a dog.
+c: Zoe
+s: A baby?
+c: Margaret
+s: We're going to try. Yes.
+c: Tyler
+s: But you're—
+d: (He stops himself, sensing danger.)
+c: Tyler
+s: I mean. That's great.
+c: Ashley
+s: How?
+c: Margaret
+s: We're going to see a specialist. A fertility doctor. It's called IVF.
+c: Cooper
+s: What's IVF?
+c: Ashley
+s: It's when doctors help make a baby in a lab.
+c: Cooper
+s: Like Frankenbaby?
+c: David
+s: Not exactly like Frankenbaby.
+c: Zoe
+s: I want a sister.
+c: Cooper
+s: I want a brother.
+c: Tyler
+s: I want a dog.
+c: Margaret
+s: (laughing despite herself) Eat your pie.
+p: 2
+n: Scene 2 — A Doctor's Office, Two Weeks Later
+d: (DR. CHEN, 50s, sits across from MARGARET and DAVID. A model of a uterus sits on the desk with the cheerful optimism of a medical prop that has never caused anyone distress.)
+c: Dr. Chen
+s: You're both healthy. There's no reason this shouldn't work. IVF gives us a good chance.
+c: Margaret
+s: What kind of chance?
+c: Dr. Chen
+s: For your age bracket, each cycle runs about thirty to forty percent.
+c: David
+s: So we might need more than one try.
+c: Dr. Chen
+s: You might. I want you to be prepared for that.
+c: Margaret
+s: How many cycles are — I mean, at what point do people usually—
+c: Dr. Chen
+s: That's a very personal decision. Some couples try two or three cycles. Some try more. Some decide to explore other paths after one. There's no right answer.
+c: Margaret
+s: I'd like to try.
+c: David
+s: We'd like to try.
+d: (He takes her hand.)
+c: Dr. Chen
+s: Then let's get started.
+p: 3
+n: Scene 3 — The Kitchen, Seven Months Later. Late Evening.
+d: (The kitchen is quiet. The pie plate is long gone. MARGARET sits at the table alone, still in her coat. DAVID comes in, sees her, and sits beside her without saying anything.)
+c: Margaret
+s: Third time.
+c: David
+s: I know.
+c: Margaret
+s: She said my numbers were good this round. She actually said that. Good numbers.
+c: David
+s: Maggie—
+c: Margaret
+s: I'm so tired, David. Not just the shots and the waiting and the appointments. I'm tired of hoping. It's exhausting to hope that much and then—
+d: (She doesn't finish. He puts his arm around her.)
+c: David
+s: Then we stop. We don't have to do this again.
+c: Margaret
+s: But I wanted—
+c: David
+s: I know what you wanted. So did I. But I also want you to stop suffering. There are other ways to get there.
+c: Margaret
+s: Adoption.
+c: David
+s: We talked about it before. We said if it came to it—
+c: Margaret
+s: I know what we said.
+d: (Long pause.)
+c: Margaret
+s: I looked into domestic adoption, last month. When I was trying to stay positive.
+c: David
+s: And?
+c: Margaret
+s: The birth mother chooses the parents. From a profile. It's like — a beauty pageant, except what you're winning is a child and what you're losing is your dignity.
+c: David
+s: That sounds like you read that in one place and decided it was true everywhere.
+c: Margaret
+s: It's also years. It could be years.
+c: David
+s: What about international?
+c: Margaret
+s: Russia has a program. Older children are harder to place. We'd be helping a child who actually needs—
+d: (She pulls a folder from her bag. She has clearly been carrying it for a while.)
+c: David
+s: You've already been looking.
+c: Margaret
+s: I've been hoping in a different direction. Is that okay?
+c: David
+s: (opening the folder) Tell me everything.
+p: 4
+n: Scene 4 — The Living Room, One Week Later
+d: (All four children are assembled with varying degrees of cooperation. ZOE is in her pajamas even though it's four in the afternoon. COOPER has a basketball. TYLER is pretending his phone battery is dead. ASHLEY is watching her parents' faces with the alertness of a person who has already guessed something.)
+c: David
+s: We've made a decision about the baby.
+c: Cooper
+s: Frankenbaby?
+c: David
+s: We've decided not to go that route anymore.
+c: Zoe
+s: So no baby?
+c: Margaret
+s: There's going to be a baby. Well — a little girl. She's five.
+c: Tyler
+s: Five is not a baby.
+c: Margaret
+s: She's the youngest, so she's the baby. That's how it works.
+c: Ashley
+s: Where is she?
+c: David
+s: Russia. She's in an orphanage in a city called Perm. Her name is Natasha.
+d: (Silence. This lands differently than expected — not badly, just slowly.)
+c: Zoe
+s: Like the cartoon?
+c: Cooper
+s: What cartoon?
+c: Zoe
+s: Boris and Natasha. They're spies.
+c: David
+s: She's not a spy. She's a five-year-old.
+c: Tyler
+s: So we're adopting a Russian kid.
+c: Margaret
+s: Yes.
+c: Tyler
+s: Cool. (beat) Wait, does she speak English?
+c: Margaret
+s: Not yet.
+c: Cooper
+s: How do we talk to her?
+c: Ashley
+s: You learn some Russian, obviously.
+c: Cooper
+s: You learn Russian. I'll use hand signals.
+c: Zoe
+s: I'm going to teach her about My Little Pony. You don't need words for that.
+c: Margaret
+s: There's one other thing. The adoption process in Russia requires that one of us — or both of us — spend time in Russia. In Perm. Several months, possibly.
+d: (The temperature in the room changes.)
+c: Tyler
+s: How many months?
+c: David
+s: We don't know yet. At least two. Maybe three.
+c: Tyler
+s: And we'd be here.
+c: David
+s: You'd be here. Tyler, you're seventeen—
+c: Tyler
+s: I know how old I am, Dad.
+c: Ashley
+s: I'll help.
+c: Cooper
+s: I can make cereal.
+c: Zoe
+s: I can make cereal too.
+c: Margaret
+s: We'll have Mrs. Petersen next door on call. Aunt Ruthie will come on weekends. And we'll Zoom every day.
+c: Tyler
+s: (quietly) Yeah. Okay.
+d: (He looks at the floor, and for just a moment looks less like seventeen and more like twelve.)
+c: Tyler
+s: What does she look like? Natasha.
+d: (Margaret takes out her phone and shows him a photo. He looks at it. His expression shifts.)
+c: Tyler
+s: She's tiny.
+c: Margaret
+s: She is.
+c: Tyler
+s: Okay. We'll figure it out.
+p: 5
+a: Act 2
+n: Scene 1 — The Kitchen, The Morning David and Margaret Leave
+d: (Suitcases at the door. MARGARET checks and rechecks her carry-on. DAVID has a spreadsheet printed out — the schedule, the emergency contacts, the meal plan. TYLER stares at the spreadsheet as if it is written in Russian, which, given the circumstances, has a certain irony.)
+c: David
+s: Tuesday is soccer pickup at four-thirty. The rink is on Clement Street, not Sacramento — don't go to Sacramento.
+c: Tyler
+s: I won't go to Sacramento.
+c: David
+s: The pediatrician's number is on the fridge, the back-up pediatrician is—
+c: Tyler
+s: Also on the fridge. Dad. I got it.
+c: Ashley
+s: I'll make sure he gets it.
+c: Tyler
+s: (to Ashley) Mildly offensive.
+c: Cooper
+s: (appearing with a waffle) I made breakfast.
+c: David
+s: You made— thank you, Coop.
+c: Zoe
+s: (to Margaret) Are you going to cry on the plane?
+c: Margaret
+s: Probably not.
+c: Zoe
+s: I would. I cry at the part in Bambi even though I know it's coming.
+c: Margaret
+s: I'll be strong.
+c: Zoe
+s: You can cry a little. (stage whisper) I won't tell.
+d: (MARGARET pulls ZOE into a long hug. She mouths thank you over Zoe's head to no one in particular.)
+c: David
+s: Tyler. You're the man of the house. That's a cliché and I apologize for it. What I mean is: your brother and sisters are counting on you.
+c: Tyler
+s: I know, Dad.
+c: David
+s: Call me for anything. Anything. Two in the morning, doesn't matter.
+c: Tyler
+s: I will.
+d: (The taxi honks outside. A flurry of hugs. MARGARET and DAVID go. The four children stand in the kitchen listening to the cab pull away. A long silence.)
+c: Cooper
+s: Who wants my waffle? I'm not that hungry anymore.
+p: 6
+n: Scene 2 — An Orphanage in Perm, Russia
+d: (A spare but clean visiting room. A wooden table. A child's drawing on the wall — a house, a sun, stick figures. IRINA VOLKOV, 60, the regional adoption official, sits across from DAVID and MARGARET. ELENA, 30s, translates with the weary competence of someone who has done this many times.)
+c: Irina
+s: (in Russian) You have made a long journey.
+c: Elena
+s: She says you have made a long journey.
+c: Margaret
+s: We have. We're very happy to be here.
+c: Elena
+s: (translating)
+c: Irina
+s: (in Russian) The process requires patience. Russia does not give its children away quickly.
+c: Elena
+s: She says the process requires patience. Russia does not give its children away quickly.
+c: David
+s: We understand completely.
+c: Irina
+s: (studying them) (in Russian) You have other children.
+c: Elena
+s: She's asking about your other children.
+c: Margaret
+s: Four. They're at home in San Francisco. Ages six, ten, fourteen, and seventeen.
+d: (IRINA considers this for a long moment.)
+c: Irina
+s: (in Russian) And the eldest is watching the others?
+c: Elena
+s: The eldest is watching the others?
+c: David
+s: Yes. With support from family and neighbors.
+c: Irina
+s: (in Russian, under her breath) Bozhe moy.
+c: Elena
+s: She said — she said that's very good.
+d: (ELENA and MARGARET exchange a glance that suggests ELENA's translation was approximate.)
+c: Irina
+s: (standing) (in Russian) Come. She is waiting.
+d: (They follow IRINA down a corridor. At the end, a door opens. NATASHA stands in the doorway — tiny, dark-eyed, clutching a cloth rabbit with one ear. She looks at the strangers with the wariness of a child who has learned not to expect too much.)
+d: (MARGARET crouches down to Natasha's level. She doesn't reach out — just looks at her. NATASHA looks back.)
+c: Margaret
+s: (very softly) Privet, Natasha. (Hello, Natasha.)
+d: (NATASHA says nothing. But she takes one step forward.)
+p: 7
+n: Scene 3 — The Kitchen at Home, That Same Evening
+d: (Smoke. Not an alarming amount of smoke, but smoke. TYLER fans the air with a dish towel. COOPER opens a window. ASHLEY surveys the remains of what appears to have been a chicken.)
+c: Ashley
+s: What temperature did you set the oven?
+c: Tyler
+s: Four fifty.
+c: Ashley
+s: Four fifty? Tyler, it said three fifty.
+c: Tyler
+s: I thought more heat meant faster cooking.
+c: Ashley
+s: That is — that's not how ovens work.
+c: Cooper
+s: (poking the chicken) It's kind of crunchy.
+c: Tyler
+s: It's rustic.
+c: Cooper
+s: The inside is still pink, though.
+c: Tyler
+s: So it's rustic and rare.
+c: Ashley
+s: You can't have rare chicken, Tyler. You will give everyone salmonella.
+c: Tyler
+s: Nobody's getting salmonella.
+c: Cooper
+s: I don't want salmonella.
+c: Zoe
+s: (appearing in the doorway) What's salmonella?
+c: Cooper
+s: It's when your chicken is wrong.
+c: Ashley
+s: (already dialing) I'm ordering pizza.
+c: Tyler
+s: I had it under control.
+c: Ashley
+s: Tyler.
+c: Tyler
+s: (pause) Yeah, okay. Get me pepperoni.
+p: 8
+n: Scene 4 — A Zoom Call. Split Stage: Russia and the Kitchen.
+d: (Left: DAVID and MARGARET in their rented apartment, sitting close to a laptop. The connection is unstable — the image pixelates, freezes, stutters. Right: all four children crowded around a tablet propped against the fruit bowl. The pizza boxes are still on the counter.)
+c: Margaret
+s: Can you see us? Hello?
+c: Tyler
+s: We can see you! You're a little—
+d: (The image freezes. MARGARET becomes a blurry statue mid-wave.)
+c: Cooper
+s: Mom is a painting.
+d: (The connection restores.)
+c: David
+s: How's everything going?
+c: Tyler
+s: Great. Really smooth. No issues.
+d: (ASHLEY looks at the ceiling. COOPER looks at his feet.)
+c: Margaret
+s: We went to the orphanage today. We met her. We met Natasha.
+c: Zoe
+s: What's she like?
+c: Margaret
+s: She's—
+d: (The connection drops for two seconds. When it returns, MARGARET is clearly emotional but trying not to show it.)
+c: Margaret
+s: She's incredible. She has these eyes—
+d: (Freeze. The audio cuts. From the kids' side, all they can see is MARGARET apparently mouthing something and DAVID nodding.)
+c: Cooper
+s: What's she saying?
+c: Ashley
+s: I can't tell. Something about eyes.
+c: Zoe
+s: Her eyes?
+c: Tyler
+s: (to the tablet) MOM. WE CAN'T—
+d: (Connection restores, mid-sentence.)
+c: Margaret
+s: —the rabbit is missing one ear, and she holds it like it's the most precious—
+d: (Freeze. Drop. A long five seconds.)
+c: Cooper
+s: What rabbit?
+c: Zoe
+s: Natasha has a rabbit!
+c: Cooper
+s: How do you know? You couldn't hear that either.
+c: Zoe
+s: I could tell from her face.
+d: (Connection restores again. Now only David is visible.)
+c: David
+s: —and that's why we won't need the—
+c: Tyler
+s: Dad, we've been missing every other sentence, we—
+c: David
+s: —the forms by Wednesday, so don't worry about that—
+c: Ashley
+s: We're not worried about forms, we didn't know there were forms—
+c: David
+s: —love you all. How's the food?
+d: (All four children glance at the pizza boxes simultaneously.)
+c: Tyler
+s: Great. Really varied.
+c: Cooper
+s: We had Italian tonight.
+c: David
+s: Good, good—
+d: (The screen goes black.)
+c: Zoe
+s: (to the dark screen) Goodnight.
+p: 9
+n: Scene 5 — The Orphanage Visiting Room, Two Weeks Later
+d: (MARGARET and NATASHA sit on the floor together. Between them: a sheet of paper and crayons. NATASHA draws with total concentration. MARGARET watches.)
+c: Margaret
+s: What is that?
+d: (NATASHA holds up the drawing. A house. Sun. Stick figures.)
+c: Margaret
+s: Is that — is that us?
+d: (NATASHA points to the tallest figure, then to DAVID. She points to the next one, then to MARGARET. Then she points to a cluster of four smaller figures.)
+c: Margaret
+s: Those are the kids at home?
+d: (NATASHA nods solemnly. Then she draws one more figure, very small, next to MARGARET. She points to it, then to herself.)
+d: (MARGARET looks at the drawing for a long moment. When she looks up, her eyes are bright.)
+c: Margaret
+s: (quietly) Da. That's you.
+d: (NATASHA carefully hands her the drawing.)
+p: 10
+n: Scene 6 — The Living Room, Week Three
+d: (TYLER is asleep on the couch. Fully dressed, shoes on. His phone is on his chest. ASHLEY comes downstairs at 7 AM, surveys the scene, and puts a blanket over him without waking him. She starts making lunches. COOPER appears.)
+c: Cooper
+s: (whispering) Is Tyler dead?
+c: Ashley
+s: (whispering) No. He was up until two helping Zoe with her science project.
+c: Cooper
+s: Tyler helped with a science project?
+c: Ashley
+s: He mostly watched YouTube tutorials and read them to her, but yes.
+c: Cooper
+s: Huh.
+d: (They both look at their sleeping brother.)
+c: Cooper
+s: He's not that bad at this.
+c: Ashley
+s: Don't tell him that. His head is already the right size.
+p: 11
+n: Scene 7 — Another Zoom Call
+d: (The connection tonight is catastrophic. Both ends of the conversation are fragmentary, and there are several seconds of audio lag. The result is that everything sounds like something else.)
+c: David
+s: We had our second meeting with Irina today, she seems—
+d: (Three-second freeze. When audio resumes, only the last word comes through.)
+c: David
+s: —drunk.
+c: Tyler
+s: WHAT?
+c: David
+s: No, not — she seems more relaxed than—
+d: (Drop.)
+c: Cooper
+s: Did Dad say the lady is drunk?
+c: Ashley
+s: The connection dropped, he didn't finish the—
+d: (Connection restores, mid-sentence from MARGARET.)
+c: Margaret
+s: —Natasha ate everything, including the borscht, which smells like a—
+d: (Four seconds of silence, then a burst of static that sounds, slightly, like a word.)
+c: Zoe
+s: Did Mom say Natasha ate a boot?
+c: Ashley
+s: No.
+c: Zoe
+s: She said boot.
+c: Ashley
+s: She said borscht. It's a soup.
+c: Zoe
+s: She said a boot.
+c: David
+s: —the paperwork is almost complete, we think we might be—
+d: (Drop. Restore.)
+c: David
+s: —home by the fourteenth.
+c: Cooper
+s: OF WHAT MONTH?
+c: David
+s: March, we're hoping—
+d: (Screen goes dark.)
+c: Tyler
+s: March. March is — that's three weeks.
+d: (He pulls out his phone and starts counting days. His face does something complicated — part relief, part something that might be pride in himself.)
+c: Tyler
+s: We can do three more weeks.
+c: Zoe
+s: Obviously. (beat) What month is the boot soup from?
+p: 12
+n: Scene 8 — The Orphanage, Final Day
+d: (IRINA stands in the doorway with a folder of papers — thick as a brick, stamped many times. She hands it to DAVID with the solemnity of someone transferring something sacred.)
+c: Irina
+s: (in Russian, to Elena)
+c: Elena
+s: She says the paperwork is complete. Natasha is yours.
+d: (DAVID shakes IRINA's hand. IRINA, who has been professionally impassive for three months, permits herself one small nod.)
+c: Irina
+s: (in Russian, quietly, to Natasha)
+c: Elena
+s: She says — be a good girl. Eat your vegetables. And write to us.
+d: (NATASHA reaches up and takes IRINA's hand for a moment. Then she lets go and walks to MARGARET, who lifts her up. NATASHA looks back at IRINA once.)
+d: (IRINA turns and walks back down the corridor without looking back. But she pauses at the corner, just for a moment, with her hand on the wall.)
+p: 13
+a: Act 3
+n: Scene 1 — San Francisco Airport, Arrivals Hall
+d: (TYLER, ASHLEY, COOPER, and ZOE wait behind the barrier. ZOE holds a hand-drawn sign that reads DOBRO POZHALOVAT NATASHA — slightly misspelled but recognizable. COOPER has a mylar balloon. TYLER has his hands in his pockets and is pretending to be cool about this. ASHLEY is not pretending anything — she is visibly nervous.)
+d: (The doors open. DAVID and MARGARET emerge, and between them, holding both their hands, is NATASHA. She is wearing a coat two sizes too big, and she is looking at everything with wide eyes.)
+d: (ZOE sees her first.)
+c: Zoe
+s: (in a whisper, to herself) She's real.
+d: (NATASHA spots the sign. She can't read English, but she can read her own name. She points at it. MARGARET crouches and says something in her ear.)
+d: (NATASHA looks at ZOE. ZOE waves. NATASHA, very seriously, waves back.)
+c: Cooper
+s: (too loud) HI NATASHA!
+d: (NATASHA flinches at the volume. DAVID gives COOPER a look.)
+c: Cooper
+s: (a whisper that is still somewhat loud) Hi, Natasha.
+d: (Something about this — the immediate correction, the effort — makes NATASHA almost smile.)
+c: Tyler
+s: (kneeling to her level) Hey. I'm Tyler. (He points to himself.) Ty-ler.
+d: (NATASHA studies him. She points at him.)
+c: Natasha
+s: Tee-ler.
+c: Tyler
+s: (grinning) Close enough.
+p: 14
+n: Scene 2 — The Living Room, Three Days Later
+d: (NATASHA sits in the middle of the living room floor. She is surrounded by ZOE's My Little Ponies, organized in a semicircle. ZOE narrates with great seriousness.)
+c: Zoe
+s: This one is Rainbow Dash. She's brave and fast. (holding up a blue pony) Rainbow Dash.
+d: (NATASHA looks at the pony. She picks it up carefully.)
+c: Natasha
+s: Ray-bo. Desh.
+c: Zoe
+s: (delighted) YES. Rainbow Dash. You got it!
+d: (NATASHA smiles for the first time — a real one, catching the corners of her eyes.)
+d: (COOPER walks through with a basketball.)
+c: Cooper
+s: (very loud and very slow) HI. NATASHA. DO. YOU. LIKE. BASKETBALL.
+d: (MARGARET, passing with laundry, stops.)
+c: Margaret
+s: Cooper, she doesn't have a hearing problem. She just speaks a different language.
+c: Cooper
+s: How else do you make someone understand?
+c: Margaret
+s: Slowly. Normally. And with your hands.
+c: Cooper
+s: (normal volume, with a mime of dribbling) Do you like basketball?
+d: (NATASHA watches his hands. She imitates the dribbling motion perfectly.)
+c: Cooper
+s: She can play. (to Natasha) You. Me. Outside. Basketball.
+d: (He mimes this. NATASHA stands up. Apparently yes.)
+c: Zoe
+s: (to Rainbow Dash) She'll be back.
+p: 15
+n: Scene 3 — The Kitchen, Six Weeks Later
+d: (NATASHA sits at the table doing a puzzle. She has been at it for thirty minutes. TYLER sits across from her, supposedly doing homework, mostly watching her. She finishes a section and looks up at him.)
+c: Natasha
+s: Tee-ler.
+c: Tyler
+s: Yeah?
+c: Natasha
+s: (very careful English) This piece. Is. Wrong.
+c: Tyler
+s: (leaning over) Which — oh. You're right. That goes over there.
+c: Natasha
+s: I know.
+d: (He blinks.)
+c: Tyler
+s: You — yeah, you do know. (beat) Since when do you know English?
+c: Natasha
+s: (shrugging in a way that is entirely too sophisticated for a five-year-old) Zoe. Teaches. Also television.
+c: Tyler
+s: Zoe teaches you from TV?
+c: Natasha
+s: Pony television.
+c: Tyler
+s: My Little Pony is teaching you English.
+c: Natasha
+s: Is good show.
+d: (TYLER stares at her. Then he laughs — loud and real, the first time in months.)
+p: 16
+n: Scene 4 — The Living Room, Three Months After the Return. Evening.
+d: (The whole family is together — an ordinary chaotic dinner that has migrated to the living room. DAVID is trying to fix the remote. MARGARET is on the phone. COOPER and ZOE argue about something. TYLER is on the couch. NATASHA sits beside him, showing him something on a tablet.)
+c: Natasha
+s: (in clear, accented English) Tyler. Look. Rainbow Dash. She race.
+c: Tyler
+s: She races. Yeah, she's fast.
+c: Natasha
+s: Fastest.
+c: Tyler
+s: Fastest. You remembered.
+d: (MARGARET ends her call and looks around the room — really looks, the way you do when you're trying to memorize something.)
+c: Margaret
+s: (to David, quietly) Look at this.
+c: David
+s: (looking up from the remote) What?
+c: Margaret
+s: Just. Look.
+d: (He looks. The kids. The noise. The chaos. NATASHA laughing at something on the tablet.)
+c: David
+s: Yeah.
+d: (He puts the remote down.)
+c: Cooper
+s: (to Zoe) I'm telling you, it goes in the blue bin.
+c: Zoe
+s: It's not blue enough.
+c: Cooper
+s: It's paper. Paper goes in—
+c: Ashley
+s: (from the hallway) Natasha. Eta tvoya chashka? (Is this your cup?)
+d: (The room goes quiet. Everyone turns. ASHLEY stands in the hallway, holding a small cup. NATASHA looks at her with wide eyes.)
+c: Natasha
+s: Da. Moyo. (Yes. Mine.)
+c: Ashley
+s: (in Russian) Ya nashla yeyo pod kanapoy. (I found it under the couch.)
+c: Natasha
+s: (in Russian, suddenly animated) Ya yego tam ostavila dlya mishki! (I left it there for the mouse!)
+c: Ashley
+s: (in Russian, laughing) Kakoy mishka? (What mouse?)
+d: (NATASHA launches into a long, enthusiastic Russian explanation involving gestures, the tablet, and what appears to be a character from the pony show. ASHLEY follows every word.)
+d: (Everyone stares at ASHLEY.)
+c: Cooper
+s: Since WHEN?
+c: Ashley
+s: Since — it's been a while.
+c: Tyler
+s: How long is a while?
+c: Ashley
+s: I started the week they left. I thought — someone should be able to talk to her. When she got here.
+d: (A silence. NATASHA has stopped her story and is watching ASHLEY's face.)
+c: Margaret
+s: Ashley.
+c: Ashley
+s: (embarrassed) It's just an app. And some books. It's not that—
+c: Margaret
+s: Come here.
+d: (ASHLEY crosses the room. MARGARET hugs her. DAVID joins in, then COOPER piles on, then ZOE. TYLER hangs back, arms crossed, pretending to find the ceiling very interesting. NATASHA watches this from the couch.)
+d: (Then she climbs down, walks across the room, and wraps her arms around as many of them as she can reach.)
+c: Tyler
+s: (muffled, from inside the pile) Okay. Room for one more.
+d: (He joins in.)
+d: (NATASHA says something in Russian, her voice muffled against someone's shoulder.)
+c: Ashley
+s: (laughing and crying at the same time) She says you all smell like dogs.
+c: Zoe
+s: (from somewhere in the pile) See? We should get a dog.
+d: (Lights fade.)
+n: End of Play
