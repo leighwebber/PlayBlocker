@@ -1432,11 +1432,15 @@ function computeOffsetFromRange(range) {
  */
 function commitCursorMove(iframeDoc, caretRange, targetPositions) {
     const oldCursor = iframeDoc.getElementById("script-cursor");
-    if (oldCursor) oldCursor.remove();
+    if (oldCursor) {
+        oldCursor.closest("p.Speech")?.classList.remove("pb-current-speech");
+        oldCursor.remove();
+    }
     const cursor = iframeDoc.createElement("span");
     cursor.id        = "script-cursor";
     cursor.className = "script-cursor";
     caretRange.insertNode(cursor);
+    cursor.closest("p.Speech")?.classList.add("pb-current-speech");
     isDirty = true;
 
     speakerAreaElement.querySelectorAll('[id^="shadow-div-"], .movement-marker').forEach(el => el.remove());
@@ -1472,6 +1476,7 @@ function attachIFrameListeners() {
                 animation: pb-cursor-blink 0.7s step-end infinite;
             }
             @keyframes pb-cursor-blink { 50% { opacity: 0; } }
+            .pb-current-speech { background: #d8d8d8; }
         `;
         iframeDoc.head.appendChild(style);
     }
