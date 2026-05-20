@@ -1,4 +1,5 @@
 import { API_URL } from './Constants.js';
+import { openFeedbackModal } from './Feedback.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -111,6 +112,8 @@ async function validateSession() {
         window.location.href = '/index.html';
     }
 }
+
+document.getElementById('feedback-btn').addEventListener('click', () => openFeedbackModal());
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
     await fetch(`${API_URL}/logout`, { method: 'POST', credentials: 'include' });
