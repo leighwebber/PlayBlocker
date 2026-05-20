@@ -739,11 +739,53 @@ function detectSceneIndex(iframeDoc, referenceRange) {
 }
 
 /**
+ * Returns the set of speaker initials that appear in any movement snapshot
+ * belonging to the given scene.  Used to reconstruct onImage flags after a
+ * page reload, when sceneOnImageFlags is empty but movementPositions is not.
+ *
+ * A movement span belongs to sceneIndex N when it sits after the Nth
+ * <p class="Scene"> heading and before the (N+1)th heading (or end of script).
+ */
+function getSpeakersOnImageInScene(iframeDoc, sceneIndex) {
+    const sceneParas  = iframeDoc.querySelectorAll('p.Scene');
+    const scenePara   = sceneIndex >= 0 ? sceneParas[sceneIndex]     : null;
+    const nextScene   = sceneParas[sceneIndex + 1] ?? null;
+
+    const onImageInitials = new Set();
+
+    iframeDoc.querySelectorAll('span.m-normal').forEach(span => {
+        if (!movementPositions.has(span.id)) return;
+
+        const spanRange = iframeDoc.createRange();
+        spanRange.selectNode(span);
+
+        // Span must start after the scene heading ends
+        if (scenePara) {
+            const sceneRange = iframeDoc.createRange();
+            sceneRange.selectNode(scenePara);
+            if (spanRange.compareBoundaryPoints(Range.START_TO_END, sceneRange) <= 0) return;
+        }
+
+        // Span must start before the next scene heading starts
+        if (nextScene) {
+            const nextRange = iframeDoc.createRange();
+            nextRange.selectNode(nextScene);
+            if (spanRange.compareBoundaryPoints(Range.START_TO_START, nextRange) >= 0) return;
+        }
+
+        movementPositions.get(span.id).forEach(({ initials }) => onImageInitials.add(initials));
+    });
+
+    return onImageInitials;
+}
+
+/**
  * Handles a scene transition:
  *  - Saves the departing scene's onImage flags.
- *  - For a first visit: resets all speakers to their green-room positions.
- *  - For a return visit: restores the saved onImage flags so that the
- *    subsequent restoreSpeakerPositions call can reposition them correctly.
+ *  - Session return visit: restores saved onImage flags.
+ *  - Cross-session return visit: derives onImage flags from movement snapshots
+ *    already loaded from the DB (movementPositions is always populated on load).
+ *  - Genuinely new scene (no movements): resets all speakers to green room.
  *  - Fires loadSceneImage asynchronously (image swap doesn't block speaker logic).
  */
 function enterScene(newIndex) {
@@ -756,21 +798,31 @@ function enterScene(newIndex) {
     }
 
     if (sceneOnImageFlags.has(newIndex)) {
-        // Return visit — restore saved onImage flags; positions come from movement snapshots
+        // Previously visited this session — restore the flags we saved on departure
         const onImageSet = sceneOnImageFlags.get(newIndex);
         speakers.forEach(s => { s.onImage = onImageSet.has(s.speakerInitials); });
     } else {
-        // First visit — reset every speaker to green room
-        speakers.forEach(s => {
-            s.onImage = false;
-            s.RP = null;
-            const div = s.speakerDiv;
-            if (div) {
-                div.style.transform = `translate(${s.originalX}px, ${s.originalY}px)`;
-                div.setAttribute('data-x', s.originalX);
-                div.setAttribute('data-y', s.originalY);
-            }
-        });
+        // Not visited this session — check whether the scene has persisted movements
+        const iframeDoc = myIframe.contentDocument;
+        const onImageInitials = getSpeakersOnImageInScene(iframeDoc, newIndex);
+
+        if (onImageInitials.size > 0) {
+            // Scene has movements from a prior session: set onImage from movement data
+            // so the subsequent restoreSpeakerPositions call can reposition them.
+            speakers.forEach(s => { s.onImage = onImageInitials.has(s.speakerInitials); });
+        } else {
+            // Genuinely new scene — reset every speaker to green room
+            speakers.forEach(s => {
+                s.onImage = false;
+                s.RP = null;
+                const div = s.speakerDiv;
+                if (div) {
+                    div.style.transform = `translate(${s.originalX}px, ${s.originalY}px)`;
+                    div.setAttribute('data-x', s.originalX);
+                    div.setAttribute('data-y', s.originalY);
+                }
+            });
+        }
     }
 
     currentSceneIndex = newIndex;
