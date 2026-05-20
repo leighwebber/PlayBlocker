@@ -55,6 +55,22 @@
         .link-btn.danger { background: #dc3545; }
         .link-btn.danger:hover { background: #b02a37; }
 
+        .help-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            background: #6c757d;
+            color: white;
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: bold;
+            text-decoration: none;
+            flex-shrink: 0;
+        }
+        .help-badge:hover { background: #545b62; }
+
         main {
             display: flex;
             flex: 1;
@@ -379,11 +395,14 @@
 
             <!-- Script -->
             <div class="detail-section">
-                <h3>Script (HTML)</h3>
-                <label class="upload-label">
-                    Upload Script
-                    <input type="file" id="script-file-input" accept=".html,.htm" hidden>
-                </label>
+                <h3>Script</h3>
+                <div class="row">
+                    <label class="upload-label">
+                        Convert Text File
+                        <input type="file" id="text-file-input" accept=".txt" hidden>
+                    </label>
+                    <a class="help-badge" href="/Pages/help.html#text-format" target="_blank" title="How to format a text file">?</a>
+                </div>
                 <p id="script-status"></p>
             </div>
 

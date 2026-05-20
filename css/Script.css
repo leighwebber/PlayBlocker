@@ -45,3 +45,11 @@ span {
     margin: 0;
     display: inline;
 }
+.InLineDirection {
+    color: green;
+    font-style: italic;
+}
+.ParseError {
+    color: red;
+    font-weight: bold;
+}

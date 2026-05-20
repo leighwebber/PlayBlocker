@@ -163,6 +163,38 @@
             margin-bottom: 8px;
         }
 
+        .tag-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0 16px;
+            font-size: 13px;
+        }
+        .tag-table th {
+            background: #f0f0f0;
+            padding: 6px 10px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        .tag-table td {
+            padding: 5px 10px;
+            border: 1px solid #ddd;
+            vertical-align: middle;
+        }
+        .tag-table code, pre.example {
+            font-family: monospace;
+            font-size: 12px;
+        }
+        pre.example {
+            background: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 12px 16px;
+            line-height: 1.6;
+            overflow-x: auto;
+            margin: 10px 0;
+            white-space: pre;
+        }
+
         .step-list li::before {
             content: counter(steps);
             position: absolute;
@@ -196,6 +228,7 @@
             <li><a href="#overview">What is PlayBlocker?</a></li>
             <li><a href="#question-marks">The ? badges</a></li>
             <li><a href="#productions">Productions page</a></li>
+            <li><a href="#text-format">Text file format</a></li>
 
             <li class="nav-section">The workspace</li>
             <li><a href="#stage">Stage image</a></li>
@@ -240,7 +273,7 @@
             <p>Click <strong>Upload Image</strong> to upload a floor plan, set diagram, or any image that represents the stage. PNG and JPEG work well. The image is stored on the server and reloaded automatically each session.</p>
 
             <h3>Script</h3>
-            <p>Upload an HTML file of your script. [place holder for detailed script formatting help]</p>
+            <p>Click <strong>Convert Text File</strong> to upload a plain text file. PlayBlocker converts it into a formatted script automatically. See <a href="#text-format">Text file format</a> for the required layout.</p>
 
             <h3>Speakers</h3>
             <p>Once a script is loaded, PlayBlocker extracts the cast from it and lists them in the Speakers table. For each speaker you can set:</p>
@@ -250,6 +283,50 @@
                 <li><strong>Color</strong> — the fill color of the speaker's icon. Click the color box to choose from a palette.</li>
             </ul>
             <p>Click <strong>Save Speakers</strong> to persist your changes, then click <strong>Open in PlayBlocker</strong> to begin blocking.</p>
+        </section>
+
+        <section id="text-format">
+            <h2>Text file format</h2>
+            <p>PlayBlocker converts a plain text file into a formatted script. Every line must begin with a <strong>tag</strong> — a single letter followed by a colon — that identifies the type of content on that line.</p>
+
+            <h3>Tags</h3>
+            <table class="tag-table">
+                <thead>
+                    <tr><th>Tag</th><th>Type</th><th>Example</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>p:</code></td><td>Page number</td><td><code>p: 12</code></td></tr>
+                    <tr><td><code>a:</code></td><td>Act heading</td><td><code>a: Act 2</code></td></tr>
+                    <tr><td><code>n:</code></td><td>Scene heading</td><td><code>n: Scene 3</code></td></tr>
+                    <tr><td><code>d:</code></td><td>Stage direction</td><td><code>d: (Romeo enters, breathless.)</code></td></tr>
+                    <tr><td><code>c:</code></td><td>Character name</td><td><code>c: Juliet</code></td></tr>
+                    <tr><td><code>s:</code></td><td>Speech</td><td><code>s: O Romeo, Romeo!</code></td></tr>
+                </tbody>
+            </table>
+
+            <h3>Rules</h3>
+            <ul>
+                <li>Every line must start with one of the tags above. Any line without a tag will appear in the converted script as a red <strong>PARSING ERROR</strong> message so you can find and fix it.</li>
+                <li>Character names (<code>c:</code>) are automatically converted to uppercase, matching the convention used in professionally published scripts.</li>
+                <li>Text in parentheses within a <code>d:</code> or <code>s:</code> line is treated as an inline stage direction and displayed in green italic.</li>
+                <li>Each line stands on its own — there are no continuation lines. If a speech or stage direction runs long, put it all on a single line.</li>
+            </ul>
+
+            <h3>Example</h3>
+<pre class="example">p: 1
+a: Act 1
+n: Scene 1
+d: (The scene is a garden at night. A balcony is visible above.)
+c: Juliet
+s: Romeo, Romeo, wherefore art thou Romeo? (She steps onto the balcony.) A rose by any other name would smell as sweet.
+p: 2
+c: Romeo
+s: What light from yon window breaks? It is the East, and Juliet is the sun.
+d: (Juliet notices Romeo below and gasps.)
+c: Juliet
+s: How camest thou hither, and wherefore?</pre>
+
+            <div class="tip">Re-uploading a text file for an existing production preserves all speaker data you have already entered — names, initials, and colors are matched automatically.</div>
         </section>
 
         <section id="stage">

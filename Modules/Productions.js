@@ -17,7 +17,7 @@ const detailContent       = document.getElementById('detail-content');
 const productionNameEl    = document.getElementById('production-name');
 const imageFileInput      = document.getElementById('image-file-input');
 const imagePreview        = document.getElementById('image-preview');
-const scriptFileInput     = document.getElementById('script-file-input');
+const textFileInput       = document.getElementById('text-file-input');
 const scriptStatus        = document.getElementById('script-status');
 const speakersSection     = document.getElementById('speakers-section');
 const speakersTbody       = document.getElementById('speakers-tbody');
@@ -254,16 +254,52 @@ imageFileInput.addEventListener('change', async (e) => {
 });
 
 // ---------------------------------------------------------------------------
-// Script upload
+// Text-to-script converter
 // ---------------------------------------------------------------------------
-scriptFileInput.addEventListener('change', async (e) => {
+function convertTextScript(text) {
+    const CLASS_MAP = { p: 'PageBreak', a: 'Act', n: 'Scene', d: 'StageDirection', c: 'Speaker', s: 'Speech' };
+    const WRAP_INLINE = new Set(['StageDirection', 'Speech']);
+
+    function wrapInlineDirections(str) {
+        return str.replace(/\(([^)]*)\)/g, "<span class='InLineDirection'>($1)</span>");
+    }
+
+    const paragraphs = [];
+    for (const rawLine of text.split('\n')) {
+        const line = rawLine.trim();
+        if (!line) continue;
+        const m = line.match(/^([pancds]):\s*(.*)/);
+        if (m) {
+            const content = m[1] === 'c' ? m[2].trim().toUpperCase() : m[2];
+            paragraphs.push({ cls: CLASS_MAP[m[1]], content });
+        } else {
+            paragraphs.push({ cls: 'ParseError', content: line });
+        }
+    }
+
+    return paragraphs.map(({ cls, content }) => {
+        if (cls === 'PageBreak') {
+            return `<p class='PageBreak'>  --------------------Page ${escHtml(content.trim())}--------------------  </p>`;
+        }
+        if (cls === 'ParseError') {
+            return `<p class='ParseError'>PARSING ERROR — Each paragraph must begin with a tag: ${escHtml(content)}</p>`;
+        }
+        const inner = WRAP_INLINE.has(cls) ? wrapInlineDirections(escHtml(content)) : escHtml(content);
+        return `<p class='${cls}'>${inner}</p>`;
+    }).join('\n');
+}
+
+textFileInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file || !selectedProductionId) return;
 
-    const html   = await file.text();
-    const parser = new DOMParser();
-    const doc    = parser.parseFromString(html, 'text/html');
-    const bodyHtml = doc.body.innerHTML;
+    const bodyHtml = convertTextScript(await file.text());
+    e.target.value = '';
+
+    if (!bodyHtml.trim()) {
+        alert('No recognized content found. Make sure each line starts with p:, a:, n:, d:, c:, or s:');
+        return;
+    }
 
     const res = await fetch(`${API_URL}/productions/${selectedProductionId}/script`, {
         method:      'PUT',
@@ -273,8 +309,7 @@ scriptFileInput.addEventListener('change', async (e) => {
     });
     if (!res.ok) { alert('Failed to save script.'); return; }
 
-    scriptStatus.textContent = 'Script saved.';
-
+    scriptStatus.textContent = 'Script converted and saved.';
     const speakerRes       = await fetch(`${API_URL}/speakers?productionId=${selectedProductionId}`, { credentials: 'include' });
     const existingSpeakers = speakerRes.ok ? await speakerRes.json() : [];
     buildSpeakerList(bodyHtml, existingSpeakers);
@@ -293,11 +328,11 @@ function buildSpeakerList(scriptBody, dbSpeakers) {
         if (name) scriptNames.add(name);
     });
 
-    // Match DB rows by script_name so pre-existing data is preserved
-    const dbMap = new Map(dbSpeakers.map(s => [s.script_name, s]));
+    // Match DB rows by script_name (case-insensitive so uppercase conversion doesn't lose data)
+    const dbMap = new Map(dbSpeakers.map(s => [s.script_name.toUpperCase(), s]));
 
     currentSpeakers = Array.from(scriptNames).map(scriptName => {
-        const db = dbMap.get(scriptName);
+        const db = dbMap.get(scriptName.toUpperCase());
         return {
             scriptName,
             firstName: db?.first_name ?? '',
