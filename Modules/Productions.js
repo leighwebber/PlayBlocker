@@ -15,9 +15,6 @@ const productionList      = document.getElementById('production-list');
 const detailEmpty         = document.getElementById('detail-empty');
 const detailContent       = document.getElementById('detail-content');
 const productionNameEl    = document.getElementById('production-name');
-const imageSection        = document.getElementById('image-section');
-const imageFileInput      = document.getElementById('image-file-input');
-const imagePreview        = document.getElementById('image-preview');
 const textFileInput       = document.getElementById('text-file-input');
 const scriptStatus        = document.getElementById('script-status');
 const speakersSection     = document.getElementById('speakers-section');
@@ -183,24 +180,14 @@ async function selectProduction(id) {
 
     openPlayBlockerBtn.href = `PlayBlocker.html?productionId=${id}`;
 
-    if (production.stage_image) {
-        imagePreview.src    = production.stage_image;
-        imagePreview.hidden = false;
-    } else {
-        imagePreview.src    = '';
-        imagePreview.hidden = true;
-    }
-
     if (production.script_body) {
         scriptStatus.textContent = 'Script loaded.';
-        imageSection.hidden = false;
         buildSpeakerList(production.script_body, existingSpeakers);
         await loadAndRenderScenes(id);
     } else {
         scriptStatus.textContent = '';
         currentSpeakers = [];
         speakersSection.hidden = true;
-        imageSection.hidden = true;
         scenesSection.hidden = true;
     }
 }
@@ -234,30 +221,6 @@ document.getElementById('delete-production-btn').addEventListener('click', async
     detailEmpty.hidden   = false;
     detailContent.hidden = true;
     await loadProductions();
-});
-
-// ---------------------------------------------------------------------------
-// Image upload
-// ---------------------------------------------------------------------------
-imageFileInput.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file || !selectedProductionId) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-        const dataUrl = event.target.result;
-        imagePreview.src    = dataUrl;
-        imagePreview.hidden = false;
-
-        const res = await fetch(`${API_URL}/productions/${selectedProductionId}/image`, {
-            method:      'PUT',
-            credentials: 'include',
-            headers:     { 'Content-Type': 'application/json' },
-            body:        JSON.stringify({ image: dataUrl }),
-        });
-        if (!res.ok) alert('Failed to save image.');
-    };
-    reader.readAsDataURL(file);
 });
 
 // ---------------------------------------------------------------------------
@@ -317,7 +280,6 @@ textFileInput.addEventListener('change', async (e) => {
     if (!res.ok) { alert('Failed to save script.'); return; }
 
     scriptStatus.textContent = 'Script converted and saved.';
-    imageSection.hidden = false;
     await syncScenes(selectedProductionId, bodyHtml);
     const speakerRes       = await fetch(`${API_URL}/speakers?productionId=${selectedProductionId}`, { credentials: 'include' });
     const existingSpeakers = speakerRes.ok ? await speakerRes.json() : [];

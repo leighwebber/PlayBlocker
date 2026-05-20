@@ -183,14 +183,6 @@
         }
         .upload-label:hover { background: #0056b3; }
 
-        #image-preview {
-            display: block;
-            max-width: 400px;
-            max-height: 220px;
-            margin-top: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
 
         #script-status {
             margin-top: 8px;
@@ -422,16 +414,6 @@
                     <button class="link-btn danger" id="delete-production-btn">Delete</button>
                     <a class="link-btn secondary" id="open-playblocker-btn" href="#">Open in PlayBlocker</a>
                 </div>
-            </div>
-
-            <!-- Stage image (hidden until a script has been loaded) -->
-            <div class="detail-section" id="image-section" hidden>
-                <h3>Stage Image</h3>
-                <label class="upload-label">
-                    Upload Image
-                    <input type="file" id="image-file-input" accept="image/*" hidden>
-                </label>
-                <img id="image-preview" alt="Stage image preview" hidden>
             </div>
 
             <!-- Script -->
