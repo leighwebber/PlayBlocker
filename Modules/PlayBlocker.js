@@ -503,14 +503,21 @@ async function loadProductionData() {
         if (scenes.length) {
             const iframeDoc2 = myIframe.contentDocument;
             const cursor     = iframeDoc2.getElementById('script-cursor');
-            if (cursor) {
+            if (!cursor) {
+                // First-ever open — no saved cursor yet.  Navigate to the first
+                // Speech paragraph; commitCursorMove will call enterScene(0) and
+                // load the correct scene image.
+                currentSceneIndex = -1; // allow enterScene guard to fire
+                navigateToFirstSpeech(iframeDoc2);
+            } else {
                 const cursorRange = iframeDoc2.createRange();
                 cursorRange.selectNode(cursor);
                 currentSceneIndex = detectSceneIndex(iframeDoc2, cursorRange);
-            } else {
-                currentSceneIndex = -1;
+                // If the saved cursor sits before all Scene headings, still show
+                // scene 0's image rather than the default trapezoid.
+                await loadSceneImage(Math.max(0, currentSceneIndex));
+                if (currentSceneIndex < 0) currentSceneIndex = 0;
             }
-            await loadSceneImage(currentSceneIndex);
         }
 
         const startingPage = getCurrentPageNumber(myIframe);
@@ -791,6 +798,24 @@ async function loadSceneImage(sceneIndex) {
         };
         stageImageElement.src = newSrc;
     });
+}
+
+/**
+ * Places the cursor at the start of the first Speech paragraph and fires
+ * commitCursorMove so that scene detection, image loading, and speaker
+ * positioning all run exactly as they would for any other cursor move.
+ * Called on first open when no saved cursor exists in the script.
+ */
+function navigateToFirstSpeech(iframeDoc) {
+    const firstSpeech = iframeDoc.querySelector('p.Speech');
+    if (!firstSpeech) return;
+    firstSpeech.scrollIntoView({ behavior: 'instant', block: 'start' });
+    const range = iframeDoc.createRange();
+    range.selectNodeContents(firstSpeech);
+    range.collapse(true); // start of paragraph contents
+    snapCursorRange(range);
+    const { targetPositions } = findTargetPositions(iframeDoc, range);
+    commitCursorMove(iframeDoc, range, targetPositions);
 }
 
 // ---------------------------------------------------------------------------
