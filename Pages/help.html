@@ -281,6 +281,10 @@
             <ul>
                 <li><span class="shortcut">Tab</span> — advance the cursor to the next Speech paragraph.</li>
                 <li><span class="shortcut">Shift</span>+<span class="shortcut">Tab</span> — move the cursor back to the previous Speech paragraph.</li>
+                <li><span class="shortcut">←</span> — jump the cursor to immediately after the nearest movement marker to the left.</li>
+                <li><span class="shortcut">→</span> — jump the cursor to immediately before the nearest movement marker to the right. If the cursor is already adjacent to that marker, move past it and display the actor's path for two seconds. Press any key to dismiss the path early and continue.</li>
+                <li><span class="shortcut">Ctrl</span>+<span class="shortcut">←</span> — move to the beginning of the current sentence. If already at a sentence start, move to the start of the previous sentence. If at the beginning of a Speech paragraph, move to the last sentence of the preceding Speech paragraph.</li>
+                <li><span class="shortcut">Ctrl</span>+<span class="shortcut">→</span> — move to the beginning of the next sentence. If in the last sentence of a Speech paragraph, move to the beginning of the next Speech paragraph.</li>
                 <li><span class="shortcut">↑</span> <span class="shortcut">↓</span> <span class="shortcut">Page Up</span> <span class="shortcut">Page Down</span> — scroll the script; the cursor repositions automatically after scrolling stops.</li>
                 <li><span class="shortcut">Escape</span> — cancel a movement that has been started but not yet completed.</li>
                 <li><span class="shortcut">Space</span> — while dragging an actor icon during movement creation, freeze a waypoint marker at the current position.</li>

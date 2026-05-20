@@ -99,6 +99,12 @@ let editState = null;
 /** DOM elements created for the mousedown path-peek; cleared on mouseup. */
 let peekElements = [];
 
+/** setTimeout handle for the arrow-key movement-peek; null when inactive. */
+let peekTimeoutHandle = null;
+
+/** Capture-phase keydown listener installed during an arrow-key peek; null when inactive. */
+let peekCancelListener = null;
+
 /** The speaker panel container element. */
 let speakerAreaElement = null;
 
@@ -1138,6 +1144,14 @@ function handleKeyDown(event) {
             event.preventDefault();
             navigateToSpeech(event.shiftKey ? "prev" : "next");
             break;
+        case "ArrowLeft":
+            event.preventDefault();
+            if (event.ctrlKey || event.metaKey) { ctrlArrowLeft(); } else { arrowLeft(); }
+            break;
+        case "ArrowRight":
+            event.preventDefault();
+            if (event.ctrlKey || event.metaKey) { ctrlArrowRight(); } else { arrowRight(); }
+            break;
         case "ArrowUp":
             myIframe.contentWindow.scrollBy(0, -30);
             break;
@@ -1217,6 +1231,352 @@ function navigateToSpeech(direction) {
 
     target.scrollIntoView({ behavior: "smooth", block: "center" });
 
+    const { targetPositions } = findTargetPositions(iframeDoc, range);
+    commitCursorMove(iframeDoc, range, targetPositions);
+}
+
+// ---------------------------------------------------------------------------
+// Arrow-key navigation
+// ---------------------------------------------------------------------------
+
+/** Returns the visible text of a paragraph, skipping span.m-normal content. */
+function paraTextExcludingSpans(para) {
+    const walker = para.ownerDocument.createTreeWalker(
+        para,
+        NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+        {
+            acceptNode(node) {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    return node.classList.contains("m-normal")
+                        ? NodeFilter.FILTER_REJECT
+                        : NodeFilter.FILTER_SKIP;
+                }
+                return NodeFilter.FILTER_ACCEPT;
+            },
+        }
+    );
+    let text = "";
+    let node;
+    while ((node = walker.nextNode())) text += node.textContent;
+    return text;
+}
+
+/**
+ * Returns the character index of #script-cursor within its paragraph's
+ * visible text (i.e., excluding span.m-normal text).  Returns null if
+ * the cursor is not inside a Speech or StageDirection paragraph.
+ */
+function cursorParaCharIndex(iframeDoc) {
+    const cursor = iframeDoc.getElementById("script-cursor");
+    if (!cursor) return null;
+    const para = cursor.closest("p.Speech, p.StageDirection");
+    if (!para) return null;
+
+    let charIndex = 0;
+
+    function walk(node) {
+        if (node === cursor) return true;
+        if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains("m-normal")) return false;
+        if (node.nodeType === Node.TEXT_NODE) { charIndex += node.textContent.length; return false; }
+        for (const child of node.childNodes) { if (walk(child)) return true; }
+        return false;
+    }
+
+    return walk(para) ? charIndex : null;
+}
+
+/**
+ * Converts a character index (in the visible text returned by
+ * paraTextExcludingSpans) back to a collapsed Range inside para.
+ */
+function charIndexToRange(para, iframeDoc, charIndex) {
+    const range = iframeDoc.createRange();
+    let remaining = charIndex;
+    let found = false;
+
+    function walk(node) {
+        if (found) return;
+        if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains("m-normal")) return;
+        if (node.nodeType === Node.TEXT_NODE) {
+            if (remaining <= node.textContent.length) {
+                range.setStart(node, remaining);
+                range.collapse(true);
+                found = true;
+                return;
+            }
+            remaining -= node.textContent.length;
+            return;
+        }
+        for (const child of node.childNodes) walk(child);
+    }
+
+    walk(para);
+    if (!found) { range.setStart(para, para.childNodes.length); range.collapse(true); }
+    return range;
+}
+
+/**
+ * Returns an ascending array of character indices where sentences begin in
+ * text, using ". " (period + whitespace) as the delimiter.  Position 0 is
+ * always included.
+ */
+function sentenceStartsInText(text) {
+    const starts = [0];
+    const re = /\.\s+/g;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+        const pos = m.index + m[0].length;
+        if (pos < text.length) starts.push(pos);
+    }
+    return starts;
+}
+
+/**
+ * Returns true when cursor is positioned immediately to the left of
+ * markerSpan (allowing for adjacent empty text nodes).
+ */
+function isAdjacentLeftOf(cursor, markerSpan) {
+    let node = cursor.nextSibling;
+    while (node && node.nodeType === Node.TEXT_NODE && node.textContent.trim() === "") {
+        node = node.nextSibling;
+    }
+    return node === markerSpan;
+}
+
+/** Cancels any in-progress arrow-key peek (timeout + listener + visuals). */
+function clearArrowPeek() {
+    if (peekTimeoutHandle !== null) { clearTimeout(peekTimeoutHandle); peekTimeoutHandle = null; }
+    if (peekCancelListener !== null) {
+        window.removeEventListener("keydown", peekCancelListener, { capture: true });
+        peekCancelListener = null;
+    }
+    hideMovementPeek();
+}
+
+/**
+ * Shows the movement path for spanId for 2 seconds.  Any keypress during
+ * that window cancels the peek and re-processes the key normally.
+ */
+function triggerArrowPeek(spanId) {
+    const anchor = movementAnchorData.get(spanId);
+    if (!anchor) return;
+    const speaker = speakers.find(s => s.speakerInitials === anchor.moverInitials);
+    if (!speaker) return;
+
+    clearArrowPeek();
+    showMovementPeek(speaker);
+
+    peekTimeoutHandle = setTimeout(clearArrowPeek, 2000);
+
+    peekCancelListener = (event) => {
+        event.stopImmediatePropagation();
+        clearArrowPeek();
+        handleKeyDown(event);
+    };
+    window.addEventListener("keydown", peekCancelListener, { capture: true });
+}
+
+/**
+ * ArrowLeft: moves the cursor to immediately after the nearest m-normal span
+ * that precedes the cursor.  Repositions speakers as usual.
+ */
+function arrowLeft() {
+    const iframeDoc = myIframe.contentDocument;
+    const cursor = iframeDoc.getElementById("script-cursor");
+    if (!cursor) return;
+
+    const cursorRange = iframeDoc.createRange();
+    cursorRange.selectNode(cursor);
+
+    let bestSpan = null;
+    let bestRange = null;
+
+    iframeDoc.querySelectorAll("span.m-normal").forEach(span => {
+        const spanRange = iframeDoc.createRange();
+        spanRange.selectNode(span);
+        // Keep spans whose end is at or before cursor start (span.end ≤ cursor.start)
+        if (spanRange.compareBoundaryPoints(Range.END_TO_START, cursorRange) <= 0) {
+            if (!bestRange || spanRange.compareBoundaryPoints(Range.START_TO_START, bestRange) > 0) {
+                bestSpan = span;
+                bestRange = spanRange;
+            }
+        }
+    });
+
+    if (!bestSpan) return;
+
+    const range = iframeDoc.createRange();
+    range.setStartAfter(bestSpan);
+    range.collapse(true);
+    bestSpan.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const { targetPositions } = findTargetPositions(iframeDoc, range);
+    commitCursorMove(iframeDoc, range, targetPositions);
+}
+
+/**
+ * ArrowRight: moves the cursor to immediately before the nearest m-normal
+ * span that follows the cursor.  If the cursor is already immediately to the
+ * left of that span, moves past it instead and shows the movement peek for
+ * 2 seconds.
+ */
+function arrowRight() {
+    const iframeDoc = myIframe.contentDocument;
+    const cursor = iframeDoc.getElementById("script-cursor");
+    if (!cursor) return;
+
+    const cursorRange = iframeDoc.createRange();
+    cursorRange.selectNode(cursor);
+
+    let nearestSpan = null;
+    let nearestRange = null;
+
+    iframeDoc.querySelectorAll("span.m-normal").forEach(span => {
+        const spanRange = iframeDoc.createRange();
+        spanRange.selectNode(span);
+        // Keep spans whose start is strictly after cursor end (span.start > cursor.end)
+        if (spanRange.compareBoundaryPoints(Range.START_TO_END, cursorRange) > 0) {
+            if (!nearestRange || spanRange.compareBoundaryPoints(Range.START_TO_START, nearestRange) < 0) {
+                nearestSpan = span;
+                nearestRange = spanRange;
+            }
+        }
+    });
+
+    if (!nearestSpan) return;
+
+    if (isAdjacentLeftOf(cursor, nearestSpan)) {
+        // Move past the span and show peek
+        const range = iframeDoc.createRange();
+        range.setStartAfter(nearestSpan);
+        range.collapse(true);
+        nearestSpan.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        const { targetPositions } = findTargetPositions(iframeDoc, range);
+        commitCursorMove(iframeDoc, range, targetPositions);
+        triggerArrowPeek(nearestSpan.id);
+    } else {
+        // Move to just before the span
+        const range = iframeDoc.createRange();
+        range.setStartBefore(nearestSpan);
+        range.collapse(true);
+        nearestSpan.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        const { targetPositions } = findTargetPositions(iframeDoc, range);
+        commitCursorMove(iframeDoc, range, targetPositions);
+    }
+}
+
+/**
+ * Ctrl+ArrowLeft: moves to the beginning of the current sentence.  If the
+ * cursor is already at a sentence start, moves to the previous sentence start.
+ * If at the beginning of a Speech paragraph, moves to the last sentence of
+ * the preceding Speech paragraph.
+ */
+function ctrlArrowLeft() {
+    const iframeDoc = myIframe.contentDocument;
+    const cursor = iframeDoc.getElementById("script-cursor");
+    if (!cursor) return;
+    const para = cursor.closest("p.Speech, p.StageDirection");
+    if (!para) return;
+
+    const text   = paraTextExcludingSpans(para);
+    const starts = sentenceStartsInText(text);
+    const idx    = cursorParaCharIndex(iframeDoc);
+    if (idx === null) return;
+
+    const atSentenceStart = starts.includes(idx);
+    let prevStart = null;
+    for (let i = starts.length - 1; i >= 0; i--) {
+        if (atSentenceStart ? starts[i] < idx : starts[i] <= idx) {
+            prevStart = starts[i];
+            break;
+        }
+    }
+
+    if (prevStart !== null) {
+        const range = charIndexToRange(para, iframeDoc, prevStart);
+        para.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        const { targetPositions } = findTargetPositions(iframeDoc, range);
+        commitCursorMove(iframeDoc, range, targetPositions);
+        return;
+    }
+
+    // At the very start of the paragraph — go to last sentence of the preceding Speech para
+    const speechParas = Array.from(iframeDoc.querySelectorAll("p.Speech"));
+    const paraRange = iframeDoc.createRange();
+    paraRange.selectNodeContents(para);
+    let prevPara = null;
+    for (let i = speechParas.length - 1; i >= 0; i--) {
+        const pRange = iframeDoc.createRange();
+        pRange.selectNodeContents(speechParas[i]);
+        if (pRange.compareBoundaryPoints(Range.START_TO_START, paraRange) < 0) {
+            prevPara = speechParas[i];
+            break;
+        }
+    }
+    if (!prevPara) return;
+
+    const prevText   = paraTextExcludingSpans(prevPara);
+    const prevStarts = sentenceStartsInText(prevText);
+    const lastStart  = prevStarts[prevStarts.length - 1];
+    const range = charIndexToRange(prevPara, iframeDoc, lastStart);
+    prevPara.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const { targetPositions } = findTargetPositions(iframeDoc, range);
+    commitCursorMove(iframeDoc, range, targetPositions);
+}
+
+/**
+ * Ctrl+ArrowRight: moves to the start of the next sentence.  If the cursor
+ * is in the last sentence of the paragraph, moves to the start of the next
+ * Speech paragraph.
+ */
+function ctrlArrowRight() {
+    const iframeDoc = myIframe.contentDocument;
+    const cursor = iframeDoc.getElementById("script-cursor");
+    if (!cursor) return;
+    const para = cursor.closest("p.Speech, p.StageDirection");
+    if (!para) return;
+
+    const text   = paraTextExcludingSpans(para);
+    const starts = sentenceStartsInText(text);
+    const idx    = cursorParaCharIndex(iframeDoc);
+    if (idx === null) return;
+
+    let nextStart = null;
+    for (const s of starts) {
+        if (s > idx) { nextStart = s; break; }
+    }
+
+    if (nextStart !== null) {
+        const range = charIndexToRange(para, iframeDoc, nextStart);
+        para.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        const { targetPositions } = findTargetPositions(iframeDoc, range);
+        commitCursorMove(iframeDoc, range, targetPositions);
+        return;
+    }
+
+    // Last sentence — go to beginning of next Speech paragraph
+    const speechParas = Array.from(iframeDoc.querySelectorAll("p.Speech"));
+    const paraRange = iframeDoc.createRange();
+    paraRange.selectNodeContents(para);
+    let nextPara = null;
+    for (const p of speechParas) {
+        const pRange = iframeDoc.createRange();
+        pRange.selectNodeContents(p);
+        if (pRange.compareBoundaryPoints(Range.START_TO_START, paraRange) > 0) {
+            nextPara = p;
+            break;
+        }
+    }
+    if (!nextPara) return;
+
+    const range = iframeDoc.createRange();
+    range.setStart(nextPara, 0);
+    range.collapse(true);
+    let child = nextPara.firstChild;
+    while (child?.nodeType === Node.ELEMENT_NODE && child.classList.contains("m-normal")) {
+        range.setStartAfter(child);
+        child = child.nextSibling;
+    }
+    nextPara.scrollIntoView({ behavior: "smooth", block: "nearest" });
     const { targetPositions } = findTargetPositions(iframeDoc, range);
     commitCursorMove(iframeDoc, range, targetPositions);
 }
