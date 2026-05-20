@@ -200,6 +200,29 @@ export async function deleteMovement(movementId) {
 }
 
 // ---------------------------------------------------------------------------
+// Scenes — fetchScenes
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetches the act/scene hierarchy for a production, including any uploaded
+ * scene images.
+ *
+ * @param {number} productionId
+ * @returns {Promise<Array<{id, actNumber, actTitle, scenes: Array<{id, sceneNumber, sceneTitle, image}>}>>}
+ */
+export async function fetchScenes(productionId) {
+    const response = await fetch(`${API_URL}/productions/${productionId}/scenes`, {
+        method:      'GET',
+        credentials: 'include',
+        headers:     { 'Accept': 'application/json' },
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to fetch scenes: ${response.statusText}`);
+    }
+    return await response.json();
+}
+
+// ---------------------------------------------------------------------------
 // Movements — fetchMovements
 // ---------------------------------------------------------------------------
 

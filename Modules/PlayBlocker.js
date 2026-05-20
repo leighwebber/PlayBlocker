@@ -41,6 +41,7 @@ import {
     saveMovement,
     fetchMovements,
     fetchProduction,
+    fetchScenes,
     updateMovement,
     deleteMovement,
 } from "../Modules/Database.js";
@@ -85,6 +86,30 @@ let wasDroppedInImageArea = false;
 
 /** Bounding rect of the stage image — cached and updated on resize. */
 let stageImageRect = null;
+
+// ---------------------------------------------------------------------------
+// Scene tracking
+// ---------------------------------------------------------------------------
+
+/**
+ * Flat ordered list of scene records fetched from the API.
+ * Each entry: { id, sceneNumber, sceneTitle, image, actNumber }
+ * Index matches the count of <p class="Scene"> elements before that scene.
+ */
+let scenes = [];
+
+/**
+ * 0-based index into `scenes` for the scene the cursor is currently in.
+ * −1 = cursor is before the first Scene heading.
+ * −2 = not yet initialized (scenes haven't been fetched).
+ */
+let currentSceneIndex = -2;
+
+/**
+ * Per-scene snapshot of which speakers were on-image when the user left that scene.
+ * Key = sceneIndex, Value = Set<initials>.
+ */
+const sceneOnImageFlags = new Map();
 
 /** Maps span id (e.g. "m-3") → speakerPositions snapshot for click-to-restore. */
 const movementPositions = new Map();
@@ -465,6 +490,29 @@ async function loadProductionData() {
         attachIFrameListeners();
         restoreAtCursor();
 
+        // Fetch scenes and initialise scene tracking without disturbing speaker state
+        try {
+            const actsData = await fetchScenes(dataStore.productionId);
+            scenes = actsData.flatMap(act =>
+                act.scenes.map(s => ({ ...s, actNumber: act.actNumber }))
+            );
+        } catch (err) {
+            console.warn('loadProductionData: could not fetch scene data —', err);
+        }
+
+        if (scenes.length) {
+            const iframeDoc2 = myIframe.contentDocument;
+            const cursor     = iframeDoc2.getElementById('script-cursor');
+            if (cursor) {
+                const cursorRange = iframeDoc2.createRange();
+                cursorRange.selectNode(cursor);
+                currentSceneIndex = detectSceneIndex(iframeDoc2, cursorRange);
+            } else {
+                currentSceneIndex = -1;
+            }
+            await loadSceneImage(currentSceneIndex);
+        }
+
         const startingPage = getCurrentPageNumber(myIframe);
         pageCount          = getTotalPageCount(myIframe);
         dataStore.movementList.pageCount = pageCount;
@@ -658,6 +706,91 @@ async function saveProductionState() {
     });
     if (response.ok) isDirty = false;
     showMessage(response.ok ? "Saved." : "Save failed.", response.ok ? "success" : "error");
+}
+
+// ---------------------------------------------------------------------------
+// Scene detection and switching
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the 0-based index of the scene the cursor is currently inside,
+ * counting how many <p class="Scene"> headings precede the given range.
+ * Returns −1 if the cursor is before the first Scene heading.
+ */
+function detectSceneIndex(iframeDoc, referenceRange) {
+    let index = -1;
+    for (const para of iframeDoc.querySelectorAll('p.Scene')) {
+        const r = iframeDoc.createRange();
+        r.selectNode(para);
+        if (r.compareBoundaryPoints(Range.END_TO_START, referenceRange) <= 0) {
+            index++;
+        } else {
+            break; // headings are in document order — can stop early
+        }
+    }
+    return index;
+}
+
+/**
+ * Handles a scene transition:
+ *  - Saves the departing scene's onImage flags.
+ *  - For a first visit: resets all speakers to their green-room positions.
+ *  - For a return visit: restores the saved onImage flags so that the
+ *    subsequent restoreSpeakerPositions call can reposition them correctly.
+ *  - Fires loadSceneImage asynchronously (image swap doesn't block speaker logic).
+ */
+function enterScene(newIndex) {
+    // Save onImage state for the scene we are leaving
+    if (currentSceneIndex >= -1) {
+        sceneOnImageFlags.set(
+            currentSceneIndex,
+            new Set(speakers.filter(s => s.onImage).map(s => s.speakerInitials))
+        );
+    }
+
+    if (sceneOnImageFlags.has(newIndex)) {
+        // Return visit — restore saved onImage flags; positions come from movement snapshots
+        const onImageSet = sceneOnImageFlags.get(newIndex);
+        speakers.forEach(s => { s.onImage = onImageSet.has(s.speakerInitials); });
+    } else {
+        // First visit — reset every speaker to green room
+        speakers.forEach(s => {
+            s.onImage = false;
+            s.RP = null;
+            const div = s.speakerDiv;
+            if (div) {
+                div.style.transform = `translate(${s.originalX}px, ${s.originalY}px)`;
+                div.setAttribute('data-x', s.originalX);
+                div.setAttribute('data-y', s.originalY);
+            }
+        });
+    }
+
+    currentSceneIndex = newIndex;
+    loadSceneImage(newIndex); // async — does not block speaker repositioning
+}
+
+/**
+ * Swaps the stage image to the one for the given scene index and updates
+ * the cached image-geometry variables used by repositionSpeakers.
+ * No-ops if the src would not change.
+ */
+async function loadSceneImage(sceneIndex) {
+    const sceneData = sceneIndex >= 0 ? scenes[sceneIndex] : null;
+    const newSrc    = sceneData?.image || DEFAULT_STAGE_SRC;
+    if (stageImageElement.src === newSrc) return;
+
+    await new Promise(resolve => {
+        stageImageElement.onload = () => {
+            stageImageRect = stageImageElement.getBoundingClientRect();
+            imgLeftOld = imgLeftNew = stageImageRect.left;
+            imgTopOld  = imgTopNew  = stageImageRect.top;
+            imgWidthOld  = imgWidthNew  = stageImageRect.width;
+            imgHeightOld = imgHeightNew = stageImageRect.height;
+            resolve();
+        };
+        stageImageElement.src = newSrc;
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -1806,6 +1939,15 @@ function commitCursorMove(iframeDoc, caretRange, targetPositions) {
     isDirty = true;
 
     speakerAreaElement.querySelectorAll('[id^="shadow-div-"], .movement-marker').forEach(el => el.remove());
+
+    // Scene-change detection: runs after shadow cleanup, before speaker repositioning,
+    // so onImage flags are correct when restoreSpeakerPositions executes.
+    if (scenes.length && currentSceneIndex !== -2) {
+        const newSceneIndex = detectSceneIndex(iframeDoc, caretRange);
+        if (newSceneIndex !== currentSceneIndex) {
+            enterScene(newSceneIndex);
+        }
+    }
 
     if (targetPositions) restoreSpeakerPositions(targetPositions);
 }
