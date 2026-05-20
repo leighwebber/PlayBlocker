@@ -15,6 +15,7 @@ const productionList      = document.getElementById('production-list');
 const detailEmpty         = document.getElementById('detail-empty');
 const detailContent       = document.getElementById('detail-content');
 const productionNameEl    = document.getElementById('production-name');
+const imageSection        = document.getElementById('image-section');
 const imageFileInput      = document.getElementById('image-file-input');
 const imagePreview        = document.getElementById('image-preview');
 const textFileInput       = document.getElementById('text-file-input');
@@ -190,11 +191,13 @@ async function selectProduction(id) {
 
     if (production.script_body) {
         scriptStatus.textContent = 'Script loaded.';
+        imageSection.hidden = false;
         buildSpeakerList(production.script_body, existingSpeakers);
     } else {
         scriptStatus.textContent = '';
         currentSpeakers = [];
         speakersSection.hidden = true;
+        imageSection.hidden = true;
     }
 }
 
@@ -310,6 +313,7 @@ textFileInput.addEventListener('change', async (e) => {
     if (!res.ok) { alert('Failed to save script.'); return; }
 
     scriptStatus.textContent = 'Script converted and saved.';
+    imageSection.hidden = false;
     const speakerRes       = await fetch(`${API_URL}/speakers?productionId=${selectedProductionId}`, { credentials: 'include' });
     const existingSpeakers = speakerRes.ok ? await speakerRes.json() : [];
     buildSpeakerList(bodyHtml, existingSpeakers);

@@ -46,6 +46,16 @@ import {
 } from "../Modules/Database.js";
 
 // ---------------------------------------------------------------------------
+// Default stage image (shown when no image has been uploaded for a production)
+// ---------------------------------------------------------------------------
+
+const DEFAULT_STAGE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 230">
+  <polygon points="150,0 550,0 700,200 0,200" fill="#f5f5f5" stroke="#bbb" stroke-width="2"/>
+  <text x="350" y="222" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" fill="#aaa">Stage image will appear here</text>
+</svg>`;
+const DEFAULT_STAGE_SRC = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(DEFAULT_STAGE_SVG);
+
+// ---------------------------------------------------------------------------
 // Module-level state
 // ---------------------------------------------------------------------------
 
@@ -418,20 +428,17 @@ async function loadProductionData() {
     }
 
     // ---- Stage image ----
-    if (production.stage_image) {
-        await new Promise(resolve => {
-            stageImageElement.onload = () => {
-                // Recapture geometry with the new image's rendered dimensions
-                stageImageRect  = stageImageElement.getBoundingClientRect();
-                imgLeftOld  = stageImageRect.left;
-                imgTopOld   = stageImageRect.top;
-                imgWidthOld = stageImageRect.width;
-                imgHeightOld = stageImageRect.height;
-                resolve();
-            };
-            stageImageElement.src = production.stage_image;
-        });
-    }
+    await new Promise(resolve => {
+        stageImageElement.onload = () => {
+            stageImageRect  = stageImageElement.getBoundingClientRect();
+            imgLeftOld  = stageImageRect.left;
+            imgTopOld   = stageImageRect.top;
+            imgWidthOld = stageImageRect.width;
+            imgHeightOld = stageImageRect.height;
+            resolve();
+        };
+        stageImageElement.src = production.stage_image || DEFAULT_STAGE_SRC;
+    });
 
     // ---- Script ----
     if (production.script_body) {
