@@ -358,22 +358,34 @@ function extractSceneStructure(scriptHtml) {
 async function syncScenes(productionId, scriptHtml) {
     const acts = extractSceneStructure(scriptHtml);
     if (!acts.length) { scenesSection.hidden = true; return; }
-    const res = await fetch(`${API_URL}/productions/${productionId}/scenes`, {
-        method:      'POST',
-        credentials: 'include',
-        headers:     { 'Content-Type': 'application/json' },
-        body:        JSON.stringify(acts),
-    });
-    if (!res.ok) { console.error('syncScenes failed'); return; }
-    const { acts: savedActs } = await res.json();
+    let savedActs;
+    try {
+        const res = await fetch(`${API_URL}/productions/${productionId}/scenes`, {
+            method:      'POST',
+            credentials: 'include',
+            headers:     { 'Content-Type': 'application/json' },
+            body:        JSON.stringify(acts),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        ({ acts: savedActs } = await res.json());
+    } catch (err) {
+        console.error('syncScenes failed:', err);
+        scriptStatus.textContent = `Scene sync failed (${err.message}) — server may need to be restarted.`;
+        return;
+    }
     renderSceneGrid(savedActs);
 }
 
 async function loadAndRenderScenes(productionId) {
-    const res = await fetch(`${API_URL}/productions/${productionId}/scenes`, { credentials: 'include' });
-    if (!res.ok) { scenesSection.hidden = true; return; }
-    const acts = await res.json();
-    renderSceneGrid(acts);
+    try {
+        const res = await fetch(`${API_URL}/productions/${productionId}/scenes`, { credentials: 'include' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const acts = await res.json();
+        renderSceneGrid(acts);
+    } catch (err) {
+        console.error('loadAndRenderScenes failed:', err);
+        scenesSection.hidden = true;
+    }
 }
 
 function renderSceneGrid(acts) {
