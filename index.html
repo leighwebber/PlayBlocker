@@ -136,18 +136,38 @@
 
         #registerForm { display: none; }
 
-        #error-msg {
-            background: #fff3f3;
-            border: 1px solid #f5c6cb;
-            color: #721c24;
+        #error-msg, #info-msg {
             border-radius: 4px;
             padding: 8px 12px;
             font-size: 13px;
             margin-bottom: 16px;
             display: none;
+            line-height: 1.5;
+        }
+
+        #error-msg {
+            background: #fff3f3;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        #info-msg {
+            background: #f0fff4;
+            border: 1px solid #b2dfdb;
+            color: #1b5e20;
         }
 
         #protected-area { display: none; }
+
+        #resend-hint {
+            margin-top: 14px;
+            font-size: 13px;
+            color: #666;
+            display: none;
+        }
+
+        #resend-hint a { color: #007bff; text-decoration: none; font-weight: bold; }
+        #resend-hint a:hover { text-decoration: underline; }
     </style>
     <script src="./index.js" defer></script>
 </head>
@@ -164,6 +184,7 @@
 
 <div class="auth-panel">
     <div id="error-msg"></div>
+    <div id="info-msg"></div>
 
     <div id="loginSection">
         <h2>Sign in</h2>
@@ -178,6 +199,7 @@
             </div>
             <button type="submit" class="btn-primary">Sign in</button>
         </form>
+        <div id="resend-hint">Didn't get a confirmation email? <a href="#" id="show-resend">Resend it</a></div>
         <p class="switch-link">New to PlayBlocker? <a href="#" id="show-register">Create an account</a></p>
     </div>
 
@@ -204,24 +226,22 @@
         </form>
         <p class="switch-link">Already have an account? <a href="#" id="show-login">Sign in</a></p>
     </div>
+
+    <div id="resendSection" style="display:none">
+        <h2>Resend confirmation</h2>
+        <form id="resendForm">
+            <div class="form-group">
+                <label for="resend-email">Email address</label>
+                <input type="email" id="resend-email" name="email" placeholder="you@example.com" required>
+                <input type="hidden" id="resend-email-prefill">
+            </div>
+            <button type="submit" class="btn-primary">Send new link</button>
+        </form>
+        <p class="switch-link">Back to <a href="#" id="show-login-2">Sign in</a></p>
+    </div>
 </div>
 
 <div id="protected-area"></div>
-
-<script>
-    document.getElementById('show-register').addEventListener('click', (e) => {
-        e.preventDefault();
-        document.getElementById('loginSection').style.display = 'none';
-        document.getElementById('registerSection').style.display = 'block';
-        document.getElementById('error-msg').style.display = 'none';
-    });
-    document.getElementById('show-login').addEventListener('click', (e) => {
-        e.preventDefault();
-        document.getElementById('registerSection').style.display = 'none';
-        document.getElementById('loginSection').style.display = 'block';
-        document.getElementById('error-msg').style.display = 'none';
-    });
-</script>
 
 </body>
 </html>

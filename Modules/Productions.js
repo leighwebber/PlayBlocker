@@ -8,6 +8,8 @@ let selectedProductionId = null;
 let activeColorInput     = null;
 let activeColorPreview   = null;
 let currentSpeakers      = [];   // { scriptName, firstName, lastName, initials, color }
+let currentRoleId        = null; // 1=Owner, 2=Editor, 3=Viewer, null=AppOwner (unrestricted)
+let isAppOwner           = false;
 
 // ---------------------------------------------------------------------------
 // DOM refs
@@ -108,6 +110,8 @@ async function validateSession() {
         const data = await res.json();
         document.getElementById('username').textContent =
             [data.first_name, data.last_name].filter(Boolean).join(' ');
+        isAppOwner = !!data.is_app_owner;
+        if (isAppOwner) document.getElementById('username').title = 'App Owner';
     } catch {
         window.location.href = '/index.html';
     }
@@ -130,15 +134,35 @@ async function loadProductions() {
     renderProductionList(productions);
 }
 
+const ROLE_LABELS = { 1: 'Owner', 2: 'Editor', 3: 'Viewer' };
+
 function renderProductionList(productions) {
     productionList.innerHTML = '';
     productions.forEach(p => {
         const li = document.createElement('li');
         li.className = 'production-item';
-        li.textContent = p.name;
         li.dataset.id = p.id;
         if (p.id === selectedProductionId) li.classList.add('selected');
-        li.addEventListener('click', () => selectProduction(p.id));
+
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = p.name;
+        li.appendChild(nameSpan);
+
+        if (isAppOwner && p.owner_email) {
+            // AppOwner view: show the owner's email address under the production name
+            const ownerSpan = document.createElement('span');
+            ownerSpan.className = 'production-owner-email';
+            ownerSpan.textContent = p.owner_email;
+            li.appendChild(ownerSpan);
+        } else if (p.role_id && p.role_id !== 1) {
+            // Non-owner: show role badge so the user knows their access level
+            const badge = document.createElement('span');
+            badge.className = 'role-badge';
+            badge.textContent = ROLE_LABELS[p.role_id] || '';
+            li.appendChild(badge);
+        }
+
+        li.addEventListener('click', () => selectProduction(p.id, p.role_id ?? null));
         productionList.appendChild(li);
     });
 }
@@ -161,8 +185,9 @@ document.getElementById('new-production-btn').addEventListener('click', async ()
 // ---------------------------------------------------------------------------
 // Select a production
 // ---------------------------------------------------------------------------
-async function selectProduction(id) {
+async function selectProduction(id, roleId) {
     selectedProductionId = id;
+    currentRoleId = isAppOwner ? null : (roleId ?? 1); // null = unrestricted (AppOwner)
 
     const [prodRes, speakerRes] = await Promise.all([
         fetch(`${API_URL}/productions/${id}`, { credentials: 'include' }),
@@ -182,6 +207,14 @@ async function selectProduction(id) {
     productionNameEl.value = production.name;
 
     openPlayBlockerBtn.href = `PlayBlocker.html?productionId=${id}`;
+
+    // Gate editing controls based on role
+    const canEdit   = isAppOwner || currentRoleId <= 2; // Owner or Editor
+    const canDelete = isAppOwner || currentRoleId === 1; // Owner only
+    document.getElementById('save-name-btn').hidden        = !canEdit;
+    document.getElementById('delete-production-btn').hidden = !canDelete;
+    document.getElementById('text-file-input').closest('label').hidden = !canEdit;
+    document.getElementById('save-speakers-btn').hidden    = !canEdit;
 
     if (production.script_body) {
         scriptStatus.textContent = 'Script loaded.';

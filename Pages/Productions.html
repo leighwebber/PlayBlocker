@@ -126,6 +126,25 @@
         .production-item:hover { background: #ddd; }
         .production-item.selected { background: #007bff; color: white; }
 
+        .production-item { display: flex; flex-direction: column; gap: 1px; }
+
+        .production-owner-email {
+            font-size: 11px;
+            color: #888;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .production-item.selected .production-owner-email { color: #cce4ff; }
+
+        .role-badge {
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #888;
+        }
+        .production-item.selected .role-badge { color: #cce4ff; }
+
         /* ---- Right panel: detail ---- */
         #detail-panel {
             flex: 1;
