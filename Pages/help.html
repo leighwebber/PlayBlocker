@@ -211,6 +211,20 @@
             align-items: center;
             justify-content: center;
         }
+
+        .role-badge {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            padding: 2px 7px;
+            border-radius: 10px;
+            vertical-align: middle;
+        }
+        .role-badge.owner  { background: #e8f0fe; color: #1a56db; }
+        .role-badge.editor { background: #e6f9ee; color: #1a7f3c; }
+        .role-badge.viewer { background: #f3f3f3; color: #666; border: 1px solid #ddd; }
     </style>
 </head>
 <body>
@@ -241,6 +255,16 @@
             <li><a href="#editing">Editing a movement</a></li>
             <li><a href="#peek">Previewing a path</a></li>
             <li><a href="#saving">Saving</a></li>
+
+            <li class="nav-section">Collaboration</li>
+            <li><a href="#roles">Roles overview</a></li>
+            <li><a href="#sharing">Sharing a production</a></li>
+            <li><a href="#view-only">View-only mode</a></li>
+
+            <li class="nav-section">Your account</li>
+            <li><a href="#profile">Your profile</a></li>
+            <li><a href="#two-factor">Two-factor authentication</a></li>
+            <li><a href="#email-verify">Email verification</a></li>
 
             <li class="nav-section">Other</li>
             <li><a href="#feedback">Send Feedback</a></li>
@@ -282,10 +306,19 @@
             <p>Once a script is loaded, PlayBlocker extracts the cast from it and lists them in the Speakers table. For each speaker you can set:</p>
             <ul>
                 <li><strong>First / Last name</strong> — displayed in alerts and tooltips.</li>
-                <li><strong>Initials</strong> — the two-letter code shown on the stage diagram and inside movement markers in the script.</li>
-                <li><strong>Color</strong> — the fill color of the speaker's icon. Click the color box to choose from a palette.</li>
+                <li><strong>Initials</strong> — the two-letter code shown on the stage diagram and inside movement markers in the script. Must be unique across the cast.</li>
+                <li><strong>Color</strong> — the fill color of the speaker's icon. Type a CSS color name or click the <strong>▼</strong> button to pick from a palette.</li>
             </ul>
             <p>Click <strong>Save Speakers</strong> to persist your changes, then click <strong>Open in PlayBlocker</strong> to begin blocking.</p>
+
+            <h3>Autofill speakers</h3>
+            <p>If you have not yet assigned names, initials, or colors, click <strong>Autofill</strong> to populate the empty fields automatically. The autofill uses a set of colorful placeholder names and assigns distinct initials derived from each character's script name. Review and adjust the suggestions before saving — they are just a starting point.</p>
+
+            <h3>Scene images</h3>
+            <p>If your script contains Act and Scene headings, a <strong>Scene Images</strong> section appears below the Speakers table. You can upload one image per scene — useful for photographing set models, floor-plan sketches, or production photos. These images are for reference only and are not used in the blocking workspace.</p>
+
+            <h3>Collaborators</h3>
+            <p>If you are the Owner of a production you can invite other PlayBlocker users to collaborate. See <a href="#sharing">Sharing a production</a> for details.</p>
         </section>
 
         <section id="text-format">
@@ -427,6 +460,109 @@ s: How camest thou hither, and wherefore?</pre>
             <p>Click the <strong>Save</strong> button in the top bar of the blocking workspace to save the current state of the annotated script to the server. This preserves the cursor position, all movement markers, and the current actor layout so the session can be resumed exactly as you left it.</p>
             <p>Individual speaker positions and new movements are saved to the server automatically as you work, so you will not lose blocking data if you forget to click Save — but the cursor position and the overall script state are only saved when you click the button.</p>
             <div class="tip">The browser will warn you if you try to close or navigate away from the page with unsaved changes.</div>
+        </section>
+
+        <section id="roles">
+            <h2>Roles overview</h2>
+            <p>Every production has one <strong>Owner</strong>, who created it. Owners can invite other PlayBlocker users to collaborate, each with one of three roles:</p>
+            <ul>
+                <li><span class="role-badge owner">Owner</span> — full control: rename, delete, manage speakers, upload scripts, manage collaborators, and do all blocking work.</li>
+                <li><span class="role-badge editor">Editor</span> — can open the production in the workspace, record and edit movements, and reposition actors. Cannot delete the production, change its name, or manage collaborators.</li>
+                <li><span class="role-badge viewer">Viewer</span> — read-only access. Can open the production in the workspace and navigate the script, but cannot move actors, record movements, or save changes. A <strong>View only</strong> badge is displayed in the workspace toolbar to indicate this mode.</li>
+            </ul>
+            <p>On the Productions page, your role is shown as a small badge next to each production name in the left panel.</p>
+        </section>
+
+        <section id="sharing">
+            <h2>Sharing a production</h2>
+            <p>If you are the Owner of a production, a <strong>Collaborators</strong> section appears at the bottom of the production detail panel when that production is selected.</p>
+
+            <h3>Adding a collaborator</h3>
+            <ol class="step-list">
+                <li>Select the production in the left panel.</li>
+                <li>Scroll to the <strong>Collaborators</strong> section.</li>
+                <li>Enter the email address of the person you want to invite.</li>
+                <li>Choose their role — <strong>Editor</strong> or <strong>Viewer</strong>.</li>
+                <li>Click <strong>Add</strong>. The user must already have a PlayBlocker account.</li>
+            </ol>
+            <p>The production will appear in the invited user's production list the next time they sign in.</p>
+
+            <h3>Revoking access</h3>
+            <p>Each collaborator row has a <strong>Revoke</strong> button. Clicking it immediately removes that user's access to the production. The production disappears from their list on next page load.</p>
+
+            <div class="tip">You cannot revoke the Owner's own access — the Owner role is permanent for the user who created the production.</div>
+        </section>
+
+        <section id="view-only">
+            <h2>View-only mode</h2>
+            <p>When you open a production for which you have the <span class="role-badge viewer">Viewer</span> role, the workspace enters view-only mode automatically:</p>
+            <ul>
+                <li>A <strong>View only</strong> badge appears in the toolbar.</li>
+                <li>The <strong>Save</strong> button is hidden.</li>
+                <li>Actor icons cannot be dragged or repositioned.</li>
+                <li>Right-clicking in the script does not start a new movement.</li>
+            </ul>
+            <p>You can still navigate freely through the script, use all keyboard shortcuts to move the cursor, and preview actor paths by holding the mouse button down on an icon.</p>
+        </section>
+
+        <section id="profile">
+            <h2>Your profile</h2>
+            <p>You can update your name and password at any time from the Profile modal.</p>
+            <ul>
+                <li>On the <strong>Productions page</strong>, click your name in the top-right corner.</li>
+                <li>In the <strong>blocking workspace</strong>, click the <strong>Profile</strong> button in the toolbar.</li>
+            </ul>
+
+            <h3>Personal details</h3>
+            <p>Your first and last name appear in the header of the Productions page and in system messages. Edit them in the <strong>Personal Details</strong> section of the Profile modal and click <strong>Save Details</strong>.</p>
+
+            <h3>Changing your password</h3>
+            <ol class="step-list">
+                <li>Open the Profile modal.</li>
+                <li>In the <strong>Change Password</strong> section, enter your current password.</li>
+                <li>Enter and confirm your new password (minimum 8 characters).</li>
+                <li>Click <strong>Change Password</strong>.</li>
+            </ol>
+            <p>If the current password you enter is incorrect, an error message will appear and the password will not be changed.</p>
+        </section>
+
+        <section id="two-factor">
+            <h2>Two-factor authentication</h2>
+            <p>Two-factor authentication (2FA) adds a second step to sign-in. When enabled, a one-time code is emailed to you each time you sign in, and you must enter it before access is granted.</p>
+
+            <h3>Enabling 2FA</h3>
+            <ol class="step-list">
+                <li>Open the Profile modal (click your name on the Productions page, or <strong>Profile</strong> in the workspace toolbar).</li>
+                <li>In the <strong>Two-Factor Authentication</strong> section, select <strong>Email</strong>.</li>
+                <li>Click <strong>Save Security Settings</strong>.</li>
+            </ol>
+            <p>2FA takes effect at your next sign-in.</p>
+
+            <h3>Signing in with 2FA</h3>
+            <ol class="step-list">
+                <li>Enter your email and password on the sign-in page as normal.</li>
+                <li>A 6-digit code is sent to your email address.</li>
+                <li>The sign-in page switches to a verification code screen. Enter the code and click <strong>Verify</strong>.</li>
+                <li>The code is valid for 10 minutes. If it expires, return to the sign-in page and sign in again to receive a new code.</li>
+            </ol>
+
+            <h3>Disabling 2FA</h3>
+            <p>Open the Profile modal, select <strong>Disabled</strong> in the Two-Factor Authentication section, and click <strong>Save Security Settings</strong>.</p>
+
+            <div class="tip">Use the <strong>Back to Sign in</strong> link on the verification code screen if you need to sign in with a different account or request a fresh code.</div>
+        </section>
+
+        <section id="email-verify">
+            <h2>Email verification</h2>
+            <p>When you create a new PlayBlocker account, a confirmation email is sent to the address you registered with. You must click the link in that email before you can sign in.</p>
+            <p>If you did not receive the email, or if the link has expired:</p>
+            <ol class="step-list">
+                <li>Attempt to sign in. An error message will appear explaining that your email has not yet been confirmed.</li>
+                <li>Click the <strong>Resend it</strong> link that appears below the error.</li>
+                <li>Enter your email address and click <strong>Send new link</strong>.</li>
+                <li>Check your inbox for a fresh confirmation email and click the link.</li>
+            </ol>
+            <div class="tip">Check your spam or junk folder if the confirmation email doesn't arrive within a few minutes.</div>
         </section>
 
         <section id="feedback">
