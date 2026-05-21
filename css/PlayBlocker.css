@@ -115,6 +115,19 @@ iframe {
   top: 30px;
   right: 215px;
 }
+#view-only-badge {
+  position: absolute;
+  top: 33px;
+  right: 330px;
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: #fff;
+  background: #6c757d;
+  border-radius: 10px;
+  padding: 2px 9px;
+}
 .app-title  {
   font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
   font-size: 18pt;

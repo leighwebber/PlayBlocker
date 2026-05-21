@@ -68,6 +68,9 @@ let isDragging = false;
 /** True when the script or cursor has changed since the last save. */
 let isDirty = false;
 
+/** True when the logged-in user only has Viewer access to this production. */
+let viewerMode = false;
+
 /** Sequential counter for movement-marker element ids. */
 let markerCount = 0;
 
@@ -329,8 +332,8 @@ async function playBlockerPageSetup() {
         </div>`;
     document.body.appendChild(confirmOverlay);
 
-    speakerAreaElement.addEventListener("contextmenu", onSpeakerAreaContextMenu);
-    speakerAreaElement.addEventListener("mousedown",   onSpeakerDivMouseDown);
+    speakerAreaElement.addEventListener("contextmenu", (e) => { if (!viewerMode) onSpeakerAreaContextMenu(e); });
+    speakerAreaElement.addEventListener("mousedown",   (e) => { if (!viewerMode) onSpeakerDivMouseDown(e); });
     document.addEventListener("mouseup", hideMovementPeek);
 
     // Block all interaction outside edit artifacts while in edit mode
@@ -351,6 +354,7 @@ async function playBlockerPageSetup() {
     myIframe.contentWindow.addEventListener("contextmenu", async (event) => {
         event.preventDefault();
         event.stopPropagation();
+        if (viewerMode) return;
 
         // Right-clicking a movement marker span opens Delete / Cancel options
         const markerSpan = event.target.closest("span.m-normal");
@@ -530,7 +534,9 @@ async function loadProductionData() {
         slider.value     = startingPage;
         output.innerHTML = slider.value;
 
-        document.getElementById("saveScript").style.visibility    = "visible";
+        viewerMode = production.role_id === 3;
+        document.getElementById("saveScript").style.visibility    = viewerMode ? "hidden" : "visible";
+        document.getElementById("view-only-badge").hidden         = !viewerMode;
         document.getElementById("slidecontainer").style.visibility = "visible";
         scriptLoaded = true;
         isDirty = repaired; // prompt save if validation had to clean anything up
@@ -2236,6 +2242,7 @@ interact(".draggable").draggable({
          * set up the shadow icon at the drag origin.
          */
         start(event) {
+            if (viewerMode) { event.interaction.stop(); return; }
             isDragging = true;
 
             // Store the pre-drag transform so we can restore it if the drop is invalid
@@ -2402,6 +2409,7 @@ interact(".stage-image").dropzone({
     },
 
     async ondrop(event) {
+        if (viewerMode) return;
         wasDroppedInImageArea = true;
 
         if (inEditMode) {
