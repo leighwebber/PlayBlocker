@@ -214,6 +214,7 @@ async function selectProduction(id, roleId) {
     document.getElementById('save-name-btn').hidden        = !canEdit;
     document.getElementById('delete-production-btn').hidden = !canDelete;
     document.getElementById('text-file-input').closest('label').hidden = !canEdit;
+    document.getElementById('autofill-speakers-btn').hidden = !canEdit;
     document.getElementById('save-speakers-btn').hidden    = !canEdit;
 
     if (production.script_body) {
@@ -458,6 +459,73 @@ function renderSceneGrid(acts) {
 // ---------------------------------------------------------------------------
 // Speaker list: parse script → merge with DB → render form
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Speaker autofill
+// ---------------------------------------------------------------------------
+
+const AUTOFILL_FIRST_NAMES = [
+    'Montgomery', 'Cornelius', 'Reginald', 'Percival', 'Horatio',
+    'Thaddeus', 'Archibald', 'Wellington', 'Fitzgerald', 'Barnabas',
+    'Evangeline', 'Millicent', 'Prudence', 'Clementine', 'Arabella',
+    'Cordelia', 'Lavinia', 'Rosalind', 'Imogen', 'Peregrine',
+    'Algernon', 'Septimus', 'Clarence', 'Ferdinand', 'Ignatius',
+];
+
+const AUTOFILL_LAST_NAMES = [
+    'Crumpet', 'Shufflebottom', 'Bumblington', 'Snodgrass', 'Wigglebottom',
+    'Thistlethwaite', 'Pumpernickel', 'Cheesewright', 'Blunderbuss', 'Faversham',
+    'Ffortescue', 'Featherstone', 'Witherspoon', 'Mifflington', 'Ponsonby',
+    'Boggle', 'Trumpington', 'Dithering', 'Rumbold', 'Cholmondeley',
+    'Bottomsworth', 'Wobblethorpe', 'Crankshaw', 'Frogmorton', 'Plunkett',
+];
+
+const AUTOFILL_COLORS = [
+    'darkred', 'darkblue', 'darkgreen', 'darkmagenta', 'saddlebrown',
+    'teal', 'indigo', 'darkgoldenrod', 'darkslategray', 'maroon',
+    'midnightblue', 'darkolivegreen', 'darkviolet', 'seagreen', 'crimson',
+    'darkcyan', 'chocolate', 'darkslateblue', 'sienna', 'navy',
+];
+
+function autofillSpeakers() {
+    const usedInitials = new Set(
+        currentSpeakers.filter(s => s.initials).map(s => s.initials.toUpperCase())
+    );
+
+    function makeInitials(scriptName) {
+        const letters = scriptName.replace(/[^A-Za-z]/g, '').toUpperCase();
+        const first = letters[0] || 'X';
+        // Try first letter paired with each subsequent letter in the script name
+        for (let i = 1; i < letters.length; i++) {
+            const candidate = first + letters[i];
+            if (!usedInitials.has(candidate)) {
+                usedInitials.add(candidate);
+                return candidate;
+            }
+        }
+        // Fallback: first letter + digit
+        for (let n = 2; n <= 9; n++) {
+            const candidate = first + n;
+            if (!usedInitials.has(candidate)) {
+                usedInitials.add(candidate);
+                return candidate;
+            }
+        }
+        return first + '?';
+    }
+
+    let colorIdx = currentSpeakers.filter(s => s.color).length % AUTOFILL_COLORS.length;
+
+    currentSpeakers.forEach((speaker, i) => {
+        if (!speaker.firstName) speaker.firstName = AUTOFILL_FIRST_NAMES[i % AUTOFILL_FIRST_NAMES.length];
+        if (!speaker.lastName)  speaker.lastName  = AUTOFILL_LAST_NAMES[i  % AUTOFILL_LAST_NAMES.length];
+        if (!speaker.initials)  speaker.initials  = makeInitials(speaker.scriptName);
+        if (!speaker.color)   { speaker.color     = AUTOFILL_COLORS[colorIdx % AUTOFILL_COLORS.length]; colorIdx++; }
+    });
+
+    renderSpeakerForm();
+    document.getElementById('speakers-msg').textContent = 'Fields autofilled — review and adjust before saving.';
+}
+
 function buildSpeakerList(scriptBody, dbSpeakers) {
     const parser = new DOMParser();
     const doc    = parser.parseFromString(`<html><body>${scriptBody}</body></html>`, 'text/html');
@@ -563,10 +631,38 @@ function renderSpeakerForm() {
 // ---------------------------------------------------------------------------
 // Save speakers
 // ---------------------------------------------------------------------------
+document.getElementById('autofill-speakers-btn').addEventListener('click', autofillSpeakers);
+
 document.getElementById('save-speakers-btn').addEventListener('click', async () => {
     if (!selectedProductionId) return;
 
-    const payload = currentSpeakers.map(s => ({
+    const speakersMsg = document.getElementById('speakers-msg');
+    speakersMsg.style.color = '#555';
+    speakersMsg.textContent = '';
+
+    // Skip speakers where every editable field is blank
+    const toSave = currentSpeakers.filter(s =>
+        s.firstName.trim() || s.lastName.trim() || s.initials.trim() || s.color.trim()
+    );
+
+    // Block save if any included speaker is missing initials
+    const missingInitials = toSave.filter(s => !s.initials.trim()).map(s => s.scriptName);
+    if (missingInitials.length) {
+        speakersMsg.style.color = '#dc3545';
+        speakersMsg.textContent = `Missing initials: ${missingInitials.join(', ')}. Initials are required.`;
+        return;
+    }
+
+    // Block save if initials are not unique
+    const initialsArr = toSave.map(s => s.initials.trim().toUpperCase());
+    const duplicates  = initialsArr.filter((v, i) => initialsArr.indexOf(v) !== i);
+    if (duplicates.length) {
+        speakersMsg.style.color = '#dc3545';
+        speakersMsg.textContent = `Duplicate initials: ${[...new Set(duplicates)].join(', ')}. Each speaker needs unique initials.`;
+        return;
+    }
+
+    const payload = toSave.map(s => ({
         scriptName: s.scriptName,
         firstName:  s.firstName,
         lastName:   s.lastName,
@@ -581,8 +677,9 @@ document.getElementById('save-speakers-btn').addEventListener('click', async () 
         body:        JSON.stringify(payload),
     });
 
-    if (!res.ok) { alert('Failed to save speakers.'); return; }
-    alert('Speakers saved.');
+    if (!res.ok) { speakersMsg.style.color = '#dc3545'; speakersMsg.textContent = 'Failed to save speakers.'; return; }
+    speakersMsg.style.color = '#28a745';
+    speakersMsg.textContent = `${toSave.length} speaker${toSave.length !== 1 ? 's' : ''} saved.`;
 });
 
 // ---------------------------------------------------------------------------
