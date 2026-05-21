@@ -239,6 +239,21 @@
         </form>
         <p class="switch-link">Back to <a href="#" id="show-login-2">Sign in</a></p>
     </div>
+
+    <div id="otpSection" style="display:none">
+        <h2>Check your email</h2>
+        <p style="font-size:13px;color:#666;margin-bottom:20px;line-height:1.5;">A 6-digit verification code has been sent to your email address. Enter it below to complete sign-in.</p>
+        <form id="otpForm">
+            <div class="form-group">
+                <label for="otp-code">Verification code</label>
+                <input type="text" id="otp-code" name="otp" placeholder="123456" maxlength="6"
+                       inputmode="numeric" pattern="[0-9]{6}" required autocomplete="one-time-code"
+                       style="letter-spacing:0.25em;font-size:20px;text-align:center;">
+            </div>
+            <button type="submit" class="btn-primary">Verify</button>
+        </form>
+        <p class="switch-link"><a href="#" id="show-login-otp">Back to Sign in</a></p>
+    </div>
 </div>
 
 <div id="protected-area"></div>

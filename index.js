@@ -1,5 +1,7 @@
 const API_URL = "https://lwebber.ca/api";
 
+let pendingEmail = null; // stored while OTP step is in progress
+
 // ---------------------------------------------------------------------------
 // Message helpers
 // ---------------------------------------------------------------------------
@@ -55,24 +57,38 @@ function showLogin() {
     document.getElementById('loginSection').style.display = 'block';
     document.getElementById('registerSection').style.display = 'none';
     document.getElementById('resendSection').style.display = 'none';
+    document.getElementById('otpSection').style.display = 'none';
+    pendingEmail = null;
 }
 
 function showRegister() {
     document.getElementById('loginSection').style.display = 'none';
     document.getElementById('registerSection').style.display = 'block';
     document.getElementById('resendSection').style.display = 'none';
+    document.getElementById('otpSection').style.display = 'none';
+    pendingEmail = null;
 }
 
 function showResendForm() {
     document.getElementById('loginSection').style.display = 'none';
     document.getElementById('registerSection').style.display = 'none';
+    document.getElementById('otpSection').style.display = 'none';
     document.getElementById('resendSection').style.display = 'block';
 }
 
-document.getElementById('show-register').addEventListener('click', (e) => { e.preventDefault(); hideMessages(); showRegister(); });
-document.getElementById('show-login').addEventListener('click',    (e) => { e.preventDefault(); hideMessages(); showLogin(); });
-document.getElementById('show-login-2').addEventListener('click',  (e) => { e.preventDefault(); hideMessages(); showLogin(); });
-document.getElementById('show-resend').addEventListener('click',   (e) => { e.preventDefault(); hideMessages(); showResendForm(); });
+function showOtp() {
+    document.getElementById('loginSection').style.display = 'none';
+    document.getElementById('registerSection').style.display = 'none';
+    document.getElementById('resendSection').style.display = 'none';
+    document.getElementById('otpSection').style.display = 'block';
+    document.getElementById('otp-code').focus();
+}
+
+document.getElementById('show-register').addEventListener('click',   (e) => { e.preventDefault(); hideMessages(); showRegister(); });
+document.getElementById('show-login').addEventListener('click',      (e) => { e.preventDefault(); hideMessages(); showLogin(); });
+document.getElementById('show-login-2').addEventListener('click',    (e) => { e.preventDefault(); hideMessages(); showLogin(); });
+document.getElementById('show-login-otp').addEventListener('click',  (e) => { e.preventDefault(); hideMessages(); showLogin(); });
+document.getElementById('show-resend').addEventListener('click',     (e) => { e.preventDefault(); hideMessages(); showResendForm(); });
 
 // ---------------------------------------------------------------------------
 // Login
@@ -94,6 +110,11 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
             return;
         }
         const body = await res.json().catch(() => ({}));
+        if (res.status === 202 && body.requires_2fa) {
+            pendingEmail = data.email;
+            showOtp();
+            return;
+        }
         if (res.status === 403 && body.message === 'email_not_verified') {
             showError('Please confirm your email address before signing in.');
             document.getElementById('resend-email-prefill').value = data.email;
@@ -157,6 +178,35 @@ document.getElementById('resendForm').addEventListener('submit', async (e) => {
         // Always show the neutral message to avoid enumeration
         showInfo('If that address is registered and unverified, a new confirmation link has been sent. Please check your inbox.');
         showLogin();
+    } catch {
+        showError('Could not reach the server. Check your connection and try again.');
+    }
+});
+
+// ---------------------------------------------------------------------------
+// OTP verification
+// ---------------------------------------------------------------------------
+
+document.getElementById('otpForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideMessages();
+    const otp = document.getElementById('otp-code').value.trim();
+    if (!pendingEmail) { showLogin(); return; }
+    try {
+        const res = await fetch(`${API_URL}/verify-otp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ email: pendingEmail, otp }),
+        });
+        if (res.ok) {
+            window.location.href = '/Pages/Productions.html';
+            return;
+        }
+        const body = await res.json().catch(() => ({}));
+        showError(body.error || 'Invalid or expired code. Please try again.');
+        document.getElementById('otp-code').value = '';
+        document.getElementById('otp-code').focus();
     } catch {
         showError('Could not reach the server. Check your connection and try again.');
     }

@@ -1,0 +1,29 @@
+p: 1
+a: Act 1
+n: Scene 1 - outside the house
+d: (The scene is the outside of a house. There is a balcony on the second floor and a door on the main floor. It is a bright, sunlit morning.)
+c: Juliet
+s: Romeo, Romeo, wherefore art thou Romeo? (She steps onto balcony.) A rose by any other name would smell as sweet.
+p: 2 
+c: Romeo
+s: What light from yon window breaks? It is the East, and Juliet is the sun?
+d: (Juliet hears Romeo and waves her hankie)
+s: Aha! My love waveth her hankie!
+d: (Juliet's father appears on the balcony)
+c: Father
+s: Who are you talking to, fair daughter? And what's with the hankie?
+p: 3
+c: Juliet
+s: Why, I was just admiring the beautiful day, father dear.
+d: (Father crosses his arms and looks skeptical)
+c: Father
+s: I'm calling BS on that one.
+n: Scene 2 - in the garden
+d: (In the Capulet garden. Romeo is sitting on a bench, getting impatient.)
+c: Romeo
+s: Now where did she get to? Late as usual.
+d: Juliet enters from stage right.
+c: Romeo
+s: She lives! Where have you been?
+
+

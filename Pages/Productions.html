@@ -37,7 +37,18 @@
             gap: 16px;
         }
 
-        #username { font-weight: bold; }
+        #username {
+            font-weight: bold;
+            background: none;
+            border: none;
+            padding: 0;
+            font-family: inherit;
+            font-size: inherit;
+            color: inherit;
+            cursor: pointer;
+            text-decoration: underline dotted;
+        }
+        #username:hover { color: #007bff; }
 
         .link-btn {
             padding: 5px 12px;
@@ -419,7 +430,7 @@
 <header>
     <h1>Dramatic Productions</h1>
     <div class="header-right">
-        <span>Logged in as <span id="username"></span></span>
+        <span>Logged in as <button id="username" title="Edit your profile"></button></span>
         <button class="link-btn secondary" id="feedback-btn">Send Feedback</button>
         <a class="link-btn secondary" href="/Pages/help.html" target="_blank">Help</a>
         <button class="link-btn secondary" id="logout-btn">Log out</button>

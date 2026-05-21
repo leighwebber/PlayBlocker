@@ -1,5 +1,6 @@
 import { API_URL } from './Constants.js';
 import { openFeedbackModal } from './Feedback.js';
+import { openProfileModal } from './Profile.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -122,6 +123,7 @@ async function validateSession() {
 }
 
 document.getElementById('feedback-btn').addEventListener('click', () => openFeedbackModal());
+document.getElementById('username').addEventListener('click', () => openProfileModal());
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
     await fetch(`${API_URL}/logout`, { method: 'POST', credentials: 'include' });

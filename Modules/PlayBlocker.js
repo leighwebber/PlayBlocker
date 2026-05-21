@@ -47,6 +47,7 @@ import {
 } from "../Modules/Database.js";
 
 import { openFeedbackModal } from "../Modules/Feedback.js";
+import { openProfileModal } from "../Modules/Profile.js";
 
 // ---------------------------------------------------------------------------
 // Default stage image (shown when no image has been uploaded for a production)
@@ -308,6 +309,7 @@ async function playBlockerPageSetup() {
 
     document.getElementById("saveScript").addEventListener("click", saveProductionState);
     document.getElementById("feedback-btn").addEventListener("click", () => openFeedbackModal());
+    document.getElementById("profile-btn").addEventListener("click", () => openProfileModal());
 
     setHelpBar("Left-click in the script to move the cursor · Right-click a Speech to start a movement · Hold a speaker icon to preview their path");
 
