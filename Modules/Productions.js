@@ -22,8 +22,12 @@ const textFileInput       = document.getElementById('text-file-input');
 const scriptStatus        = document.getElementById('script-status');
 const speakersSection     = document.getElementById('speakers-section');
 const speakersTbody       = document.getElementById('speakers-tbody');
-const scenesSection       = document.getElementById('scenes-section');
-const scenesGrid          = document.getElementById('scenes-grid');
+const scenesSection          = document.getElementById('scenes-section');
+const scenesGrid             = document.getElementById('scenes-grid');
+const collaboratorsSection   = document.getElementById('collaborators-section');
+const collaboratorsList      = document.getElementById('collaborators-list');
+const addCollaboratorForm    = document.getElementById('add-collaborator-form');
+const collabMsg              = document.getElementById('collab-msg');
 const colorPickerPopup    = document.getElementById('color-picker-popup');
 const colorGrid           = document.getElementById('color-grid');
 const colorSearch         = document.getElementById('color-search');
@@ -216,6 +220,14 @@ async function selectProduction(id, roleId) {
     document.getElementById('text-file-input').closest('label').hidden = !canEdit;
     document.getElementById('autofill-speakers-btn').hidden = !canEdit;
     document.getElementById('save-speakers-btn').hidden    = !canEdit;
+
+    // Collaborators section: visible to Owner and AppOwner only
+    const canManageRoles = isAppOwner || currentRoleId === 1;
+    collaboratorsSection.hidden = !canManageRoles;
+    if (canManageRoles) {
+        collabMsg.textContent = '';
+        await loadCollaborators(id);
+    }
 
     if (production.script_body) {
         scriptStatus.textContent = 'Script loaded.';
@@ -680,6 +692,81 @@ document.getElementById('save-speakers-btn').addEventListener('click', async () 
     if (!res.ok) { speakersMsg.style.color = '#dc3545'; speakersMsg.textContent = 'Failed to save speakers.'; return; }
     speakersMsg.style.color = '#28a745';
     speakersMsg.textContent = `${toSave.length} speaker${toSave.length !== 1 ? 's' : ''} saved.`;
+});
+
+// ---------------------------------------------------------------------------
+// Collaborators
+// ---------------------------------------------------------------------------
+
+const ROLE_BADGE_CLASS = { 1: 'owner', 2: 'editor', 3: 'viewer' };
+
+async function loadCollaborators(productionId) {
+    const res = await fetch(`${API_URL}/productions/${productionId}/roles`, { credentials: 'include' });
+    if (!res.ok) return;
+    renderCollaborators(await res.json());
+}
+
+function renderCollaborators(collaborators) {
+    collaboratorsList.innerHTML = '';
+    if (collaborators.length === 0) {
+        collaboratorsList.innerHTML = '<p style="font-size:13px;color:#999;">No collaborators yet.</p>';
+        return;
+    }
+    collaborators.forEach(c => {
+        const row = document.createElement('div');
+        row.className = 'collab-row';
+
+        const badgeClass = ROLE_BADGE_CLASS[c.role_id] || 'viewer';
+        const canRevoke  = c.role_id !== 1 && (isAppOwner || currentRoleId === 1);
+
+        row.innerHTML = `
+            <span class="collab-name">${escHtml([c.first_name, c.last_name].filter(Boolean).join(' '))}</span>
+            <span class="collab-email">${escHtml(c.email)}</span>
+            <span class="collab-role-badge ${badgeClass}">${escHtml(c.role_name)}</span>
+            ${canRevoke ? `<button class="link-btn danger" style="padding:3px 10px;font-size:12px;" data-user-id="${c.user_id}">Revoke</button>` : ''}
+        `;
+        collaboratorsList.appendChild(row);
+    });
+
+    // Wire revoke buttons
+    collaboratorsList.querySelectorAll('[data-user-id]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            if (!confirm('Revoke this user\'s access to the production?')) return;
+            const userId = btn.dataset.userId;
+            const res = await fetch(`${API_URL}/productions/${selectedProductionId}/roles/${userId}`, {
+                method: 'DELETE', credentials: 'include',
+            });
+            if (!res.ok) { setCollabMsg('Failed to revoke access.', false); return; }
+            await loadCollaborators(selectedProductionId);
+            setCollabMsg('Access revoked.', true);
+        });
+    });
+}
+
+function setCollabMsg(text, success) {
+    collabMsg.textContent  = text;
+    collabMsg.style.color  = success ? '#28a745' : '#dc3545';
+}
+
+addCollaboratorForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    setCollabMsg('', true);
+    const email   = document.getElementById('collab-email').value.trim();
+    const role_id = parseInt(document.getElementById('collab-role').value);
+    if (!email || !selectedProductionId) return;
+
+    const res = await fetch(`${API_URL}/productions/${selectedProductionId}/roles`, {
+        method:      'POST',
+        credentials: 'include',
+        headers:     { 'Content-Type': 'application/json' },
+        body:        JSON.stringify({ email, role_id }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) { setCollabMsg(body.error || 'Failed to add collaborator.', false); return; }
+
+    document.getElementById('collab-email').value = '';
+    await loadCollaborators(selectedProductionId);
+    setCollabMsg(`${email} added.`, true);
 });
 
 // ---------------------------------------------------------------------------

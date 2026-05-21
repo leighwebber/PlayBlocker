@@ -387,6 +387,31 @@
             border-radius: 3px;
             flex-shrink: 0;
         }
+
+        /* ---- Collaborators list ---- */
+        .collab-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 0;
+            border-bottom: 1px solid #f4f4f4;
+            font-size: 13px;
+        }
+        .collab-row:last-child { border-bottom: none; }
+        .collab-name { font-weight: bold; color: #333; flex-shrink: 0; }
+        .collab-email { color: #666; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .collab-role-badge {
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            padding: 2px 7px;
+            border-radius: 10px;
+            flex-shrink: 0;
+        }
+        .collab-role-badge.owner  { background: #e8f0fe; color: #1a56db; }
+        .collab-role-badge.editor { background: #e6f9ee; color: #1a7f3c; }
+        .collab-role-badge.viewer { background: #f3f3f3; color: #666; }
     </style>
 </head>
 <body>
@@ -473,6 +498,31 @@
             <div class="detail-section" id="scenes-section" hidden>
                 <h3>Scene Images</h3>
                 <div id="scenes-grid"></div>
+            </div>
+
+            <!-- Collaborators (shown for Owner and AppOwner) -->
+            <div class="detail-section" id="collaborators-section" hidden>
+                <h3>Collaborators</h3>
+                <div id="collaborators-list"></div>
+
+                <form id="add-collaborator-form" style="margin-top:14px;">
+                    <div class="row" style="flex-wrap:nowrap;align-items:flex-end;gap:8px;">
+                        <div style="flex:1;min-width:0;">
+                            <label style="display:block;font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;color:#666;margin-bottom:4px;">Email</label>
+                            <input type="email" id="collab-email" placeholder="colleague@example.com"
+                                   style="width:100%;padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:14px;font-family:inherit;">
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;color:#666;margin-bottom:4px;">Role</label>
+                            <select id="collab-role" style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:14px;font-family:inherit;background:#fff;">
+                                <option value="2">Editor</option>
+                                <option value="3">Viewer</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="link-btn" style="white-space:nowrap;margin-bottom:1px;">Add</button>
+                    </div>
+                    <p id="collab-msg" style="margin-top:8px;font-size:13px;min-height:18px;"></p>
+                </form>
             </div>
 
         </div>
