@@ -1353,6 +1353,8 @@ function repositionCursorIfOffScreen(scrolledDown) {
  * @param {KeyboardEvent} event
  */
 function handleKeyDown(event) {
+    const tag = event.target?.tagName;
+    if (tag === 'TEXTAREA' || tag === 'INPUT' || event.target?.isContentEditable) return;
     switch (event.key) {
         case " ":
             // Prevent the page from scrolling on spacebar
